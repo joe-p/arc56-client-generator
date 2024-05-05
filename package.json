@@ -1,0 +1,16 @@
+{
+  "name": "arc56-client-generator",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@algorandfoundation/algokit-utils": "^6.0.2",
+    "algosdk": "^2.7.0",
+    "nunjucks": "^3.2.4"
+  }
+}
