@@ -1,15 +1,9 @@
 # arc56-client-generator
 
-To install dependencies:
-
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.1.4. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+- [x] Call methods
+- [x] Get method params for composer
+- [x] Decode method inputs/outputs
+- [x] Create apps
+- [ ] Get state values
+- [ ] Support template variables on create
+- [ ] Other OnCompletes

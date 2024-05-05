@@ -11,6 +11,9 @@ async function main() {
     defaultSender,
   });
 
+  const { appId, appAddress } = await appClient.create().createApplication();
+  console.log("App ID:", appId, "App Address:", appAddress);
+
   const inputs: Inputs = { add: { a: 1n, b: 2n }, subtract: { a: 10n, b: 5n } };
 
   // Call the app with default sender
@@ -47,6 +50,10 @@ async function main() {
     defaultSender: bob,
   });
 
+  const { appId: anoterAppId, appAddress: anotherAppAddress } =
+    await anotherAppClient.create().createApplication();
+  console.log("App ID:", anoterAppId, "App Address:", anotherAppAddress);
+
   // Composer together multiple appClients
   const result = await algorand
     .newGroup()
@@ -69,3 +76,5 @@ async function main() {
 
   console.log("first sum:", firstSum, "second sum:", secondSum);
 }
+
+await main();
