@@ -1,10 +1,10 @@
 import ARC56 from "./ref.arc56.json";
-import {
-  AlgorandClient,
-  type SendSingleTransactionResult,
-} from "@algorandfoundation/algokit-utils";
-import { type MethodCallParams } from "@algorandfoundation/algokit-utils/types/composer";
+import { AlgorandClient } from "@algorandfoundation/algokit-utils";
+import AlgokitComposer, {
+  type MethodCallParams,
+} from "@algorandfoundation/algokit-utils/types/composer";
 import algosdk from "algosdk";
+import { type SendAtomicTransactionComposerResults } from "@algorandfoundation/algokit-utils/types/transaction";
 
 type MethodParams = Omit<
   Omit<Omit<Omit<MethodCallParams, "args">, "appId">, "method">,
@@ -40,6 +40,7 @@ export function rawValueToOutputs(rawValue: Uint8Array): Outputs {
   return { sum: decoded[0], difference: decoded[1] };
 }
 
+/* Helper Functions */
 async function compileProgram(
   algorand: AlgorandClient,
   program: "clear" | "approval"
@@ -72,12 +73,46 @@ export class ReferenceClient {
     this.defaultSender = p.defaultSender;
   }
 
+  // TOOD: Allow addMethodCall to pass in a callback function to handle errors
+  private async executeWithErrorParsing(group: AlgokitComposer) {
+    try {
+      return await group.execute();
+    } catch (e) {
+      const txId = JSON.stringify(e).match(
+        /(?<=TransactionPool.Remember: transaction )\S+(?=:)/
+      )?.[0];
+
+      const appId = BigInt(
+        JSON.stringify(e).match(/(?<=Details: app=)\d+/)?.[0] || ""
+      );
+
+      const pc = Number(JSON.stringify(e).match(/(?<=pc=)\d+/)?.[0] || "");
+
+      if (appId !== this.appId) {
+        throw e;
+      }
+
+      // TODO: Use our own source map we got during create if we have one
+      const errorMessage = ARC56.sourceInfo.find((s) =>
+        s.pc.includes(pc)
+      )?.errorMessage;
+
+      if (errorMessage) {
+        throw Error(
+          `Runtime error when executing ${ARC56.name} (appId: ${this.appId}) in transaction ${txId}: ${errorMessage}`
+        );
+      }
+
+      throw e;
+    }
+  }
+
   call = (methodParams?: MethodParams) => {
     return {
       foo: async (
         inputs: Inputs
       ): Promise<{
-        result: SendSingleTransactionResult;
+        result: SendAtomicTransactionComposerResults;
         returnValue: Outputs;
       }> => {
         const sender = methodParams?.sender ?? this.defaultSender;
@@ -86,13 +121,16 @@ export class ReferenceClient {
           throw new Error("No sender provided");
         }
 
-        const result = await this.algorand.send.methodCall({
+        const group = this.algorand.newGroup();
+        group.addMethodCall({
           sender,
           appId: this.appId,
           method: this.contract.getMethodByName("foo")!,
           args: [InputsToArray(inputs)],
           ...methodParams,
         });
+
+        const result = await this.executeWithErrorParsing(group);
 
         return {
           result,
@@ -107,7 +145,7 @@ export class ReferenceClient {
       createApplication: async (): Promise<{
         appId: bigint;
         appAddress: string;
-        result: SendSingleTransactionResult;
+        result: SendAtomicTransactionComposerResults;
       }> => {
         if (this.appId !== 0n)
           throw Error(
@@ -121,7 +159,8 @@ export class ReferenceClient {
         }
 
         // TODO: fix bug in AlgorandClient with schema
-        const result = await this.algorand.send.methodCall({
+        const group = this.algorand.newGroup();
+        group.addMethodCall({
           schema: {
             globalByteSlices: ARC56.state.schema.global.bytes,
             globalUints: ARC56.state.schema.global.ints,
@@ -135,6 +174,8 @@ export class ReferenceClient {
           method: this.contract.getMethodByName("createApplication")!,
           ...methodParams,
         });
+
+        const result = await this.executeWithErrorParsing(group);
 
         this.appId = BigInt(result.confirmations.at(-1)!.applicationIndex!);
         this.appAddress = algosdk.getApplicationAddress(this.appId);

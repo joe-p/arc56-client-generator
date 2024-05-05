@@ -75,6 +75,16 @@ async function main() {
   );
 
   console.log("first sum:", firstSum, "second sum:", secondSum);
+
+  try {
+    // This will throw an error
+    await appClient
+      .call()
+      .foo({ subtract: { a: 1n, b: 100n }, add: { a: 1n, b: 2n } });
+  } catch (e) {
+    // We got a human error message! Error: Runtime error when executing ARC56Test (appId: 6814) in transaction DEFDPU2NOGXPMNKTHJLRI5CWLDRYRHQDBMF5HXPJ3E74GWOVKNSA: subtract.a must be greater than subtract.b
+    console.log(`We got a human error message! ${e}`);
+  }
 }
 
 await main();
