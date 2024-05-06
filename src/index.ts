@@ -1,11 +1,8 @@
-import nunjucks from "nunjucks";
-import path from "path";
 import { type ARC56Contract, type StructFields } from "./types/arc56";
 import arc56Ref from "../reference/ref.arc56.json";
 import algosdk from "algosdk";
 
-/** Get all of the base ABI types used in this contract */
-function getABITypes(arc56: ARC56Contract) {
+function getABITypeLines(arc56: ARC56Contract) {
   const abiTypes: string[] = [];
 
   const pushType = (type: string) => {
@@ -73,29 +70,83 @@ function getABITypes(arc56: ARC56Contract) {
 
   const typeMap: { abiType: string; tsType: string }[] = [];
 
+  const lines = ["// Aliases for non-encoded ABI values"];
   abiTypes.forEach((t) => {
     if (t.match(/^uint/)) typeMap.push({ abiType: t, tsType: "bigint" });
     if (t === "bytes") typeMap.push({ abiType: t, tsType: "string" }); // TODO: Also support Uint8Array
   });
 
-  return typeMap;
+  const abiTypeLines = typeMap.map(
+    (typeMap) => `type ${typeMap.abiType} = ${typeMap.tsType};`
+  );
+
+  return lines.concat(abiTypeLines);
+}
+
+function getStructTypeLines(arc56: ARC56Contract) {
+  if (Object.keys(arc56.structs).length === 0) return [];
+
+  const lines = ["// Type definitions for ARC56 structs"];
+
+  let customTypeCounter = 0;
+
+  const structLines = Object.keys(arc56.structs).map((structName) => {
+    if (structName.includes(" ")) {
+      return `export type CustomType${customTypeCounter++} = ${JSON.stringify(
+        arc56.structs[structName],
+        null,
+        2
+      )}`.replace(/"/g, "");
+    } else {
+      return `export type ${structName} = ${JSON.stringify(
+        arc56.structs[structName],
+        null,
+        2
+      )}`.replace(/"/g, "");
+    }
+  });
+
+  return lines.concat(structLines);
+}
+
+function getTemplateVariableTypeLines(arc56: ARC56Contract) {
+  if (
+    arc56.templateVariables === undefined ||
+    arc56.templateVariables.length === 0
+  ) {
+    return [];
+  }
+
+  const lines = [
+    "/** Compile-time variables */",
+    "export type TemplateVariables = {",
+  ];
+
+  arc56.templateVariables.forEach((tv) => {
+    lines.push(`  ${tv.name}: ${tv.type},`);
+  });
+
+  lines.push("}");
+
+  return lines;
 }
 
 export default function generate(arc56: ARC56Contract) {
-  const abiTypes = getABITypes(arc56);
+  const content = `
+import { AlgorandClient } from "@algorandfoundation/algokit-utils";
+import AlgokitComposer, { type MethodCallParams } from "@algorandfoundation/algokit-utils/types/composer";
+import algosdk from "algosdk";
+import { type SendAtomicTransactionComposerResults } from "@algorandfoundation/algokit-utils/types/transaction";
 
-  console.log(abiTypes);
+type MethodParams = Omit<MethodCallParams,"args" | "appId" | "method" | "sender"> & { sender?: string };
 
-  const content = nunjucks.render(
-    path.join(
-      path.dirname(import.meta.url.replace("file:", "")),
-      "..",
-      "templates",
-      "arc56_client.ts.njk"
-    ),
-    { typeMapping: abiTypes }
-  );
+${getABITypeLines(arc56).join("\n")}
 
+${getStructTypeLines(arc56).join("\n")}
+
+${getTemplateVariableTypeLines(arc56).join("\n")}
+
+`.trim();
   console.log(content);
 }
 
