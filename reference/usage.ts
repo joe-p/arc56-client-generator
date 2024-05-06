@@ -27,7 +27,7 @@ async function main() {
   await algorand.send.payment({
     sender: defaultSender,
     receiver: bob,
-    amount: microAlgos(1_000_000),
+    amount: microAlgos(10_000_000),
   });
 
   const bobOutputs = await appClient.call({ sender: bob }).foo(inputs);

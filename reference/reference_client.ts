@@ -215,6 +215,24 @@ export class ReferenceClient {
       return rawValueToOutputs(rawValue);
     },
   };
+
+  state = {
+    keys: {
+      globalKey: async () => {
+        const b64Key = Buffer.from("globalKey").toString("base64");
+
+        const result = await this.algorand.client.algod
+          .getApplicationByID(Number(this.appId))
+          .do();
+
+        const keyValue = result.params["global-state"].find(
+          (s: any) => s.key === b64Key
+        );
+
+        return BigInt(keyValue.value.uint);
+      },
+    },
+  };
 }
 
 export default ReferenceClient;
