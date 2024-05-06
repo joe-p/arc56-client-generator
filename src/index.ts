@@ -155,6 +155,13 @@ class ARC56Generator {
     return `[${types.join(",")}]`;
   }
 
+  structFieldsToABIType(fields: StructFields): string {
+    return this.structFieldsToTypeScriptType(fields)
+      .replace(/ /g, "")
+      .replace(/\[/g, "(")
+      .replace(/]/g, ")");
+  }
+
   // Thanks to Claude 3 Opus...
   structFieldsToNestedArray(fields: StructFields, prefix: string = ""): string {
     function processObject(obj: StructFields, currentPrefix: string): string {
@@ -216,6 +223,67 @@ class ARC56Generator {
     return lines;
   }
 
+  getLinesForArrayToStruct(
+    structFields: StructFields,
+    lines: string[],
+    prefix = ""
+  ) {
+    let index = 0;
+
+    if (prefix === "") lines.push("return {");
+    Object.keys(structFields).forEach((sf) => {
+      if (typeof structFields[sf] === "string") {
+        lines.push(`${sf}: decoded${prefix}[${index}],`);
+        index++;
+      } else {
+        lines.push(`${sf}: {`);
+        this.getLinesForArrayToStruct(
+          // @ts-expect-error TODO: Fix this
+          structFields[sf],
+          lines,
+          `${prefix}[${index}]`
+        );
+      }
+    });
+    if (prefix) lines.push("},");
+    else lines.push("}");
+  }
+
+  getBinaryToStructLines() {
+    if (Object.keys(this.arc56.structs).length === 0) return [];
+
+    const lines = ["// Binary To Structs"];
+
+    Object.keys(this.arc56.structs).forEach((structName) => {
+      let typeName = structName;
+      if (structName.includes(" ")) {
+        typeName = `CustomType${this.customTypes.findIndex((ct) => ct === structName)}`;
+      }
+
+      lines.push(
+        `export function rawValueTo${typeName}(rawValue: Uint8Array): ${typeName} {`
+      );
+
+      const abiType = this.structFieldsToABIType(
+        this.arc56.structs[structName]
+      );
+
+      const tsType = this.structFieldsToTypeScriptType(
+        this.arc56.structs[structName]
+      );
+
+      lines.push(
+        `const decoded = algosdk.ABITupleType.from("${abiType}").decode(rawValue).valueOf() as ${tsType}\n`
+      );
+
+      this.getLinesForArrayToStruct(this.arc56.structs[structName], lines);
+
+      lines.push("}\n");
+    });
+
+    return lines;
+  }
+
   async generate() {
     const content = `
   import { AlgorandClient } from "@algorandfoundation/algokit-utils";
@@ -232,8 +300,11 @@ class ARC56Generator {
   ${this.getTemplateVariableTypeLines().join("\n")}
 
   ${this.getStructToArrayLines().join("\n")}
-  
+
+  ${this.getBinaryToStructLines().join("\n")}
   `.trim();
+
+    // console.log(content);
     console.log(await format(content, { parser: "typescript" }));
   }
 }
