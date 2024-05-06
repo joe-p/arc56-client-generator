@@ -11,10 +11,10 @@
 - [x] Error parsing
 - [x] Get state values
 - [x] Support template variables on create
-- [ ] Other OnCompletes
-- [ ] Support events
-- [ ] Support readonly
+- [ ] Other OnCompletes (will do after templating since its a lot of duplicated code)
 
 ## Future Features
 
 - [ ] Stack trace with simulate and high-level language mapping
+- [ ] Support events
+- [ ] Support readonly
