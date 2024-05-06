@@ -1,6 +1,8 @@
 import { type ARC56Contract, type StructFields } from "./types/arc56";
 import arc56Ref from "../reference/ref.arc56.json";
 import algosdk from "algosdk";
+import { format } from "prettier";
+import type { Struct } from "@algorandfoundation/algokit-utils/types/app-spec";
 
 class ARC56Generator {
   arc56: ARC56Contract;
@@ -9,7 +11,6 @@ class ARC56Generator {
 
   constructor(arc56: ARC56Contract) {
     this.arc56 = arc56;
-    this.generate();
   }
 
   getABITypeLines() {
@@ -144,7 +145,78 @@ class ARC56Generator {
     return lines;
   }
 
-  generate() {
+  structFieldsToTypeScriptType(fields: StructFields): string {
+    const types: string[] = [];
+    Object.values(fields).forEach((sf) => {
+      if (typeof sf === "string") types.push(sf);
+      else types.push(this.structFieldsToTypeScriptType(sf));
+    });
+
+    return `[${types.join(",")}]`;
+  }
+
+  // Thanks to Claude 3 Opus...
+  structFieldsToNestedArray(fields: StructFields, prefix: string = ""): string {
+    function processObject(obj: StructFields, currentPrefix: string): string {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) {
+        return "";
+      }
+
+      let result = "";
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = obj[key];
+
+        const newPrefix = currentPrefix ? `${currentPrefix}.${key}` : key;
+
+        if (typeof value === "object" && value !== null) {
+          result += `[${processObject(value, newPrefix)}]`;
+        } else {
+          result += newPrefix;
+        }
+
+        if (i < keys.length - 1) {
+          result += ",";
+        }
+      }
+
+      return result;
+    }
+
+    return `[${processObject(fields, prefix)}]`;
+  }
+
+  getStructToArrayLines() {
+    const lines: string[] = [
+      "// Convert ARC56 structs to arrays primarily for passing as methodArgs",
+    ];
+
+    Object.keys(this.arc56.structs).forEach((structName) => {
+      let typeName = structName;
+      if (structName.includes(" ")) {
+        typeName = `CustomType${this.customTypes.findIndex((ct) => ct === structName)}`;
+      }
+
+      lines.push(
+        `export function ${typeName}ToArray(${typeName.toLowerCase()}: ${typeName}): ${this.structFieldsToTypeScriptType(
+          this.arc56.structs[structName]
+        )} {`
+      );
+
+      lines.push(
+        `return ${this.structFieldsToNestedArray(
+          this.arc56.structs[structName],
+          typeName.toLocaleLowerCase()
+        )}`
+      );
+      lines.push("}\n");
+    });
+
+    return lines;
+  }
+
+  async generate() {
     const content = `
   import { AlgorandClient } from "@algorandfoundation/algokit-utils";
   import AlgokitComposer, { type MethodCallParams } from "@algorandfoundation/algokit-utils/types/composer";
@@ -158,10 +230,12 @@ class ARC56Generator {
   ${this.getStructTypeLines().join("\n")}
   
   ${this.getTemplateVariableTypeLines().join("\n")}
+
+  ${this.getStructToArrayLines().join("\n")}
   
   `.trim();
-    console.log(content);
+    console.log(await format(content, { parser: "typescript" }));
   }
 }
 
-new ARC56Generator(arc56Ref as ARC56Contract);
+new ARC56Generator(arc56Ref as ARC56Contract).generate();
