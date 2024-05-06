@@ -7,15 +7,14 @@ import algosdk from "algosdk";
 import { type SendAtomicTransactionComposerResults } from "@algorandfoundation/algokit-utils/types/transaction";
 
 type MethodParams = Omit<
-  Omit<Omit<Omit<MethodCallParams, "args">, "appId">, "method">,
-  "sender"
+  MethodCallParams,
+  "args" | "appId" | "method" | "sender"
 > & { sender?: string };
 
-type TemplateVars = { someNumber: uint64 };
-
 /* Aliases for non-encoded ABI values */
-type uint64 = bigint;
-type uint16 = number;
+{%- for typeMap in typeMapping %}
+type {{ typeMap.abiType }} = {{ typeMap.tsType }};
+{%- endfor %}
 
 /* Type definitions for ARC56 structs */
 export type Inputs = {
@@ -24,6 +23,8 @@ export type Inputs = {
 };
 export type Outputs = { sum: uint64; difference: uint64 };
 export type UnnamedType1 = { foo: uint16; bar: uint16 };
+
+type TemplateVars = { someNumber: uint64 };
 
 /* Structs To Arrays */
 export function InputsToArray(

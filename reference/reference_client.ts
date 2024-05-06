@@ -11,8 +11,6 @@ type MethodParams = Omit<
   "args" | "appId" | "method" | "sender"
 > & { sender?: string };
 
-type TemplateVars = { someNumber: uint64 };
-
 /* Aliases for non-encoded ABI values */
 type uint64 = bigint;
 type uint16 = number;
@@ -24,6 +22,8 @@ export type Inputs = {
 };
 export type Outputs = { sum: uint64; difference: uint64 };
 export type UnnamedType1 = { foo: uint16; bar: uint16 };
+
+type TemplateVars = { someNumber: uint64 };
 
 /* Structs To Arrays */
 export function InputsToArray(
