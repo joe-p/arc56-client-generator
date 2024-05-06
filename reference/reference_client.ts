@@ -13,6 +13,7 @@ type MethodParams = Omit<
 
 /* Aliases for non-encoded ABI values */
 type uint64 = bigint;
+type uint16 = number;
 
 /* Type definitions for ARC56 structs */
 export type Inputs = {
@@ -20,6 +21,7 @@ export type Inputs = {
   subtract: { a: uint64; b: uint64 };
 };
 export type Outputs = { sum: uint64; difference: uint64 };
+export type UnnamedType1 = { foo: uint16; bar: uint16 };
 
 /* Structs To Arrays */
 export function InputsToArray(
@@ -38,6 +40,14 @@ export function rawValueToOutputs(rawValue: Uint8Array): Outputs {
     .valueOf() as [uint64, uint64];
 
   return { sum: decoded[0], difference: decoded[1] };
+}
+
+export function rawValueToUnnamedType1(rawValue: Uint8Array): UnnamedType1 {
+  const decoded = algosdk.ABITupleType.from("(uint16,uint16)")
+    .decode(rawValue)
+    .valueOf() as [uint16, uint16];
+
+  return { foo: decoded[0], bar: decoded[1] };
 }
 
 /* Helper Functions */
@@ -230,6 +240,32 @@ export class ReferenceClient {
         );
 
         return BigInt(keyValue.value.uint);
+      },
+    },
+    maps: {
+      globalMap: {
+        value: async (keyValue: string) => {
+          const encodedKey = algosdk.ABIType.from("string").encode(keyValue);
+
+          const key = Buffer.concat([
+            Buffer.from("p"),
+            Buffer.from(encodedKey),
+          ]);
+
+          const b64Key = Buffer.from(key).toString("base64");
+
+          const result = await this.algorand.client.algod
+            .getApplicationByID(Number(this.appId))
+            .do();
+
+          const value = result.params["global-state"].find(
+            (s: any) => s.key === b64Key
+          );
+
+          return rawValueToUnnamedType1(
+            Buffer.from(value.value.bytes, "base64")
+          );
+        },
       },
     },
   };

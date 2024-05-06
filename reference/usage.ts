@@ -85,6 +85,13 @@ async function main() {
     // We got a human error message! Error: Runtime error when executing ARC56Test (appId: 6814) in transaction DEFDPU2NOGXPMNKTHJLRI5CWLDRYRHQDBMF5HXPJ3E74GWOVKNSA: subtract.a must be greater than subtract.b
     console.log(`We got a human error message! ${e}`);
   }
+
+  console.log("globalKey", await appClient.state.keys.globalKey());
+
+  console.log(
+    "globalMap -> foo",
+    await appClient.state.maps.globalMap.value("foo")
+  );
 }
 
 await main();

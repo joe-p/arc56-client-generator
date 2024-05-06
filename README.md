@@ -9,6 +9,6 @@
 - [x] Decode method inputs/outputs
 - [x] Create apps
 - [x] Error parsing
-- [ ] Get state values
+- [x] Get state values
 - [ ] Support template variables on create
 - [ ] Other OnCompletes
