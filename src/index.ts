@@ -2,7 +2,7 @@ import { type ARC56Contract, type StructFields } from "./types/arc56";
 import arc56Ref from "../reference/ref.arc56.json";
 import algosdk from "algosdk";
 import { format } from "prettier";
-import type { Struct } from "@algorandfoundation/algokit-utils/types/app-spec";
+import * as staticContent from "./static_content";
 
 class ARC56Generator {
   arc56: ARC56Contract;
@@ -284,14 +284,40 @@ class ARC56Generator {
     return lines;
   }
 
+  getCompileProgramLines() {
+    if (this.arc56.source === undefined) return [];
+
+    if (this.arc56.templateVariables?.length === 0) {
+      return staticContent.noTemplateVarsCompileProgram.split("\n");
+    }
+
+    const lines = [
+      `async compileProgram(algorand: AlgorandClient, program: "clear" | "approval", templateVars: TemplateVariables) {`,
+      `let tealString = Buffer.from(this.arc56.source![program], "base64").toString();`,
+    ];
+
+    this.arc56.templateVariables?.forEach((tv) => {
+      lines.push(
+        `tealString = tealString.replace(/pushint TMPL_${tv.name}/g, \`pushint \${templateVars["${tv.name}"].toString()}\`)`
+      );
+    });
+
+    lines.push(
+      `const result = await algorand.client.algod.compile(tealString).do();`,
+      `return new Uint8Array(Buffer.from(result.result, "base64"));`,
+      `}`
+    );
+
+    return lines;
+  }
+
   async generate() {
     const content = `
-  import { AlgorandClient } from "@algorandfoundation/algokit-utils";
-  import AlgokitComposer, { type MethodCallParams } from "@algorandfoundation/algokit-utils/types/composer";
-  import algosdk from "algosdk";
-  import { type SendAtomicTransactionComposerResults } from "@algorandfoundation/algokit-utils/types/transaction";
-  
-  type MethodParams = Omit<MethodCallParams,"args" | "appId" | "method" | "sender"> & { sender?: string };
+  ${staticContent.importsAndMethodParams}
+
+  const ARC56_JSON = \`${JSON.stringify(this.arc56)}\`
+
+  ${staticContent.arc56TypeDefinitions}
   
   ${this.getABITypeLines().join("\n")}
   
@@ -302,6 +328,13 @@ class ARC56Generator {
   ${this.getStructToArrayLines().join("\n")}
 
   ${this.getBinaryToStructLines().join("\n")}
+
+  export class ${this.arc56.name} {
+
+  ${staticContent.classContent}
+
+  ${this.getCompileProgramLines().join("\n")}
+  }
   `.trim();
 
     // console.log(content);

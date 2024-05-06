@@ -5,6 +5,7 @@ import AlgokitComposer, {
 } from "@algorandfoundation/algokit-utils/types/composer";
 import algosdk from "algosdk";
 import { type SendAtomicTransactionComposerResults } from "@algorandfoundation/algokit-utils/types/transaction";
+import type { Template } from "nunjucks";
 
 type MethodParams = Omit<
   MethodCallParams,
