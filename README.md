@@ -10,7 +10,7 @@
 - [x] Create apps
 - [x] Error parsing
 - [x] Get state values
-- [ ] Support template variables on create
+- [x] Support template variables on create
 - [ ] Other OnCompletes
 - [ ] Support events
 - [ ] Support readonly

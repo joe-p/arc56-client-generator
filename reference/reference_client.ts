@@ -11,6 +11,8 @@ type MethodParams = Omit<
   "sender"
 > & { sender?: string };
 
+type TemplateVars = { someNumber: uint64 };
+
 /* Aliases for non-encoded ABI values */
 type uint64 = bigint;
 type uint16 = number;
@@ -53,10 +55,19 @@ export function rawValueToUnnamedType1(rawValue: Uint8Array): UnnamedType1 {
 /* Helper Functions */
 async function compileProgram(
   algorand: AlgorandClient,
-  program: "clear" | "approval"
+  program: "clear" | "approval",
+  templateVars: TemplateVars
 ) {
-  const teal = new Uint8Array(Buffer.from(ARC56.source[program], "base64"));
-  const result = await algorand.client.algod.compile(teal).do();
+  let tealString = Buffer.from(ARC56.source[program], "base64").toString();
+
+  tealString = tealString
+    .toString()
+    .replace(
+      /pushint TMPL_someNumber/g,
+      `pushint ${templateVars["someNumber"].toString()}`
+    );
+
+  const result = await algorand.client.algod.compile(tealString).do();
 
   return new Uint8Array(Buffer.from(result.result, "base64"));
 }
@@ -150,7 +161,10 @@ export class ReferenceClient {
     };
   };
 
-  create = (methodParams?: MethodParams) => {
+  // Note: make methodParams optional UNLESS there are template variables
+  create = (
+    methodParams: MethodParams & { templateVariables: TemplateVars }
+  ) => {
     return {
       createApplication: async (): Promise<{
         appId: bigint;
@@ -177,8 +191,16 @@ export class ReferenceClient {
             localByteSlices: ARC56.state.schema.local.bytes,
             localUints: ARC56.state.schema.local.ints,
           },
-          approvalProgram: await compileProgram(this.algorand, "approval"),
-          clearProgram: await compileProgram(this.algorand, "clear"),
+          approvalProgram: await compileProgram(
+            this.algorand,
+            "approval",
+            methodParams.templateVariables
+          ),
+          clearProgram: await compileProgram(
+            this.algorand,
+            "clear",
+            methodParams.templateVariables
+          ),
           sender,
           appId: this.appId,
           method: this.contract.getMethodByName("createApplication")!,

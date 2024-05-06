@@ -11,7 +11,9 @@ async function main() {
     defaultSender,
   });
 
-  const { appId, appAddress } = await appClient.create().createApplication();
+  const { appId, appAddress } = await appClient
+    .create({ templateVariables: { someNumber: 1337n } })
+    .createApplication();
   console.log("App ID:", appId, "App Address:", appAddress);
 
   const inputs: Inputs = { add: { a: 1n, b: 2n }, subtract: { a: 10n, b: 5n } };
@@ -51,7 +53,9 @@ async function main() {
   });
 
   const { appId: anoterAppId, appAddress: anotherAppAddress } =
-    await anotherAppClient.create().createApplication();
+    await anotherAppClient
+      .create({ templateVariables: { someNumber: 1337n } })
+      .createApplication();
   console.log("App ID:", anoterAppId, "App Address:", anotherAppAddress);
 
   // Composer together multiple appClients
