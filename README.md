@@ -12,3 +12,9 @@
 - [x] Get state values
 - [ ] Support template variables on create
 - [ ] Other OnCompletes
+- [ ] Support events
+- [ ] Support readonly
+
+## Future Features
+
+- [ ] Stack trace with simulate and high-level language mapping
