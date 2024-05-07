@@ -675,6 +675,19 @@ export class ARC56Test {
           );
         },
       },
+      localMap: {
+        value: async (address: string, key: bytes): Promise<string> => {
+          const encodedKey = Buffer.concat([
+            Buffer.from("p"),
+            this.getABIEncodedValue(key, "bytes"),
+          ]);
+          return await this.getLocalStateValue(
+            address,
+            Buffer.from(encodedKey).toString("base64"),
+            "string",
+          );
+        },
+      },
     },
   };
 

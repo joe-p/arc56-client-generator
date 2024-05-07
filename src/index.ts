@@ -382,14 +382,20 @@ class ARC56Generator {
     if (Object.keys(this.arc56.state.maps).length > 0) {
       lines.push("maps: {");
 
-      // TODO: Box and Local
-      (["global"] as "global"[]).forEach((storageType) => {
+      // TODO: Box
+      (["global", "local"] as ("global" | "local")[]).forEach((storageType) => {
         this.arc56.state.maps[storageType].forEach((m) => {
           lines.push(`${m.name}: {`);
 
-          lines.push(
-            `value: async (key: ${m.keyType}): Promise<${m.valueType}> => {`
-          );
+          if (storageType === "local") {
+            lines.push(
+              `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => {`
+            );
+          } else {
+            lines.push(
+              `value: async (key: ${m.keyType}): Promise<${m.valueType}> => {`
+            );
+          }
 
           if (m.prefix) {
             lines.push(
@@ -401,10 +407,18 @@ class ARC56Generator {
             );
           }
 
-          lines.push(`return await this.getGlobalStateValue(
-            Buffer.from(encodedKey).toString("base64"),
-            "${m.valueType}"
-          );`);
+          if (storageType === "local") {
+            lines.push(`return await this.getLocalStateValue(
+              address,
+              Buffer.from(encodedKey).toString("base64"),
+              "${m.valueType}"
+            );`);
+          } else {
+            lines.push(`return await this.getGlobalStateValue(
+              Buffer.from(encodedKey).toString("base64"),
+              "${m.valueType}"
+            );`);
+          }
 
           lines.push("},");
           lines.push("},");

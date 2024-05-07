@@ -112,6 +112,11 @@ async function main() {
   await appClient.optIn().optInToApplication();
 
   console.log("localKey", await appClient.state.keys.localKey(defaultSender));
+
+  console.log(
+    "localMap",
+    await appClient.state.maps.localMap.value(defaultSender, "foo")
+  );
 }
 
 await main();
