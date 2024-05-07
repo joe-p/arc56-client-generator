@@ -345,14 +345,11 @@ export class ARC56Test {
     return type;
   }
 
-  private getABIEncodedValue(
-    value: algosdk.ABIValue,
-    type: string,
-  ): Uint8Array {
+  private getABIEncodedValue(value: any, type: string): Uint8Array {
     if (type === "bytes") return Buffer.from(value as string);
     const abiType = this.getABIType(type);
 
-    return algosdk.ABIType.from(abiType).encode(value);
+    return algosdk.ABIType.from(abiType).encode(this.getABIValue(type, value));
   }
 
   private getObjectFromStructFieldsAndArray(
@@ -419,6 +416,17 @@ export class ARC56Test {
         algosdk.encodeUint64(keyValue.value.uint),
       );
     }
+  }
+
+  private async getBoxValue(b64Key: string, type: string): Promise<any> {
+    const result = await this.algorand.client.algod
+      .getApplicationBoxByName(
+        Number(this.appId),
+        Buffer.from(b64Key, "base64"),
+      )
+      .do();
+
+    return this.getTypeScriptValue(type, result.value);
   }
 
   private async getGlobalStateValue(
@@ -661,6 +669,9 @@ export class ARC56Test {
       localKey: async (address: string): Promise<uint64> => {
         return await this.getLocalStateValue(address, "bG9jYWxLZXk=", "uint64");
       },
+      boxKey: async (): Promise<string> => {
+        return await this.getBoxValue("Ym94S2V5", "string");
+      },
     },
     maps: {
       globalMap: {
@@ -685,6 +696,18 @@ export class ARC56Test {
             address,
             Buffer.from(encodedKey).toString("base64"),
             "string",
+          );
+        },
+      },
+      boxMap: {
+        value: async (key: Inputs): Promise<Outputs> => {
+          const encodedKey = Buffer.concat([
+            Buffer.from("p"),
+            this.getABIEncodedValue(key, "Inputs"),
+          ]);
+          return await this.getBoxValue(
+            Buffer.from(encodedKey).toString("base64"),
+            "Outputs",
           );
         },
       },

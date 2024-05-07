@@ -117,6 +117,15 @@ async function main() {
     "localMap",
     await appClient.state.maps.localMap.value(defaultSender, "foo")
   );
+
+  console.log("boxKey", await appClient.state.keys.boxKey());
+  console.log(
+    "boxMap",
+    await appClient.state.maps.boxMap.value({
+      add: { a: 1n, b: 2n },
+      subtract: { a: 4n, b: 3n },
+    })
+  );
 }
 
 await main();

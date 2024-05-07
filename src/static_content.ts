@@ -325,14 +325,11 @@ private getABIType(type: string) {
   return type;
 }
 
-private getABIEncodedValue(
-  value: algosdk.ABIValue,
-  type: string
-): Uint8Array {
+private getABIEncodedValue(value: any, type: string): Uint8Array {
   if (type === "bytes") return Buffer.from(value as string);
   const abiType = this.getABIType(type);
 
-  return algosdk.ABIType.from(abiType).encode(value);
+  return algosdk.ABIType.from(abiType).encode(this.getABIValue(type, value));
 }
 
 private getObjectFromStructFieldsAndArray(
@@ -399,6 +396,17 @@ private async getLocalStateValue(
       algosdk.encodeUint64(keyValue.value.uint)
     );
   }
+}
+
+private async getBoxValue(b64Key: string, type: string): Promise<any> {
+  const result = await this.algorand.client.algod
+    .getApplicationBoxByName(
+      Number(this.appId),
+      Buffer.from(b64Key, "base64")
+    )
+    .do();
+
+  return this.getTypeScriptValue(type, result.value);
 }
 
 private async getGlobalStateValue(

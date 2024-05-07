@@ -350,31 +350,32 @@ class ARC56Generator {
     if (Object.keys(this.arc56.state.keys).length > 0) {
       lines.push("keys: {");
 
-      // TODO: Box
-      (["global", "local"] as ("global" | "local")[]).forEach((storageType) => {
-        this.arc56.state.keys[storageType].forEach((k) => {
-          if (storageType === "local") {
-            lines.push(
-              `${k.name}: async (address: string): Promise<${k.valueType}> => {`
-            );
+      (["global", "local", "box"] as ("global" | "local" | "box")[]).forEach(
+        (storageType) => {
+          this.arc56.state.keys[storageType].forEach((k) => {
+            if (storageType === "local") {
+              lines.push(
+                `${k.name}: async (address: string): Promise<${k.valueType}> => {`
+              );
 
-            lines.push(`return await this.getLocalStateValue(
+              lines.push(`return await this.getLocalStateValue(
               address,
               "${k.key}",
               "${k.valueType}"
             );`);
-          } else {
-            lines.push(`${k.name}: async (): Promise<${k.valueType}> => {`);
+            } else {
+              lines.push(`${k.name}: async (): Promise<${k.valueType}> => {`);
 
-            lines.push(`return await this.getGlobalStateValue(
+              lines.push(`return await this.${storageType === "box" ? "getBoxValue" : "getGlobalStateValue"}(
               "${k.key}",
               "${k.valueType}"
             );`);
-          }
+            }
 
-          lines.push("},");
-        });
-      });
+            lines.push("},");
+          });
+        }
+      );
 
       lines.push("},");
     }
@@ -382,48 +383,49 @@ class ARC56Generator {
     if (Object.keys(this.arc56.state.maps).length > 0) {
       lines.push("maps: {");
 
-      // TODO: Box
-      (["global", "local"] as ("global" | "local")[]).forEach((storageType) => {
-        this.arc56.state.maps[storageType].forEach((m) => {
-          lines.push(`${m.name}: {`);
+      (["global", "local", "box"] as ("global" | "local" | "box")[]).forEach(
+        (storageType) => {
+          this.arc56.state.maps[storageType].forEach((m) => {
+            lines.push(`${m.name}: {`);
 
-          if (storageType === "local") {
-            lines.push(
-              `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => {`
-            );
-          } else {
-            lines.push(
-              `value: async (key: ${m.keyType}): Promise<${m.valueType}> => {`
-            );
-          }
+            if (storageType === "local") {
+              lines.push(
+                `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => {`
+              );
+            } else {
+              lines.push(
+                `value: async (key: ${m.keyType}): Promise<${m.valueType}> => {`
+              );
+            }
 
-          if (m.prefix) {
-            lines.push(
-              `const encodedKey = Buffer.concat([Buffer.from("${m.prefix}"), this.getABIEncodedValue(key, "${m.keyType}")]);`
-            );
-          } else {
-            lines.push(
-              `const encodedKey = this.getABIEncodedValue(key, "${m.keyType}");`
-            );
-          }
+            if (m.prefix) {
+              lines.push(
+                `const encodedKey = Buffer.concat([Buffer.from("${m.prefix}"), this.getABIEncodedValue(key, "${m.keyType}")]);`
+              );
+            } else {
+              lines.push(
+                `const encodedKey = this.getABIEncodedValue(key, "${m.keyType}");`
+              );
+            }
 
-          if (storageType === "local") {
-            lines.push(`return await this.getLocalStateValue(
+            if (storageType === "local") {
+              lines.push(`return await this.getLocalStateValue(
               address,
               Buffer.from(encodedKey).toString("base64"),
               "${m.valueType}"
             );`);
-          } else {
-            lines.push(`return await this.getGlobalStateValue(
+            } else {
+              lines.push(`return await this.${storageType === "box" ? "getBoxValue" : "getGlobalStateValue"}(
               Buffer.from(encodedKey).toString("base64"),
               "${m.valueType}"
             );`);
-          }
+            }
 
-          lines.push("},");
-          lines.push("},");
-        });
-      });
+            lines.push("},");
+            lines.push("},");
+          });
+        }
+      );
     }
     lines.push("},");
     lines.push("};");
