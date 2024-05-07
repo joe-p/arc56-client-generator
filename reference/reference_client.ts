@@ -73,6 +73,24 @@ async function compileProgram(
   return new Uint8Array(Buffer.from(result.result, "base64"));
 }
 
+async function getGlobalStateValue(
+  b64Key: string,
+  algod: algosdk.Algodv2,
+  appId: bigint
+) {
+  const result = await algod.getApplicationByID(Number(appId)).do();
+
+  const keyValue = result.params["global-state"].find(
+    (s: any) => s.key === b64Key
+  );
+
+  if (keyValue.value.type === 1) {
+    return new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"));
+  } else {
+    return BigInt(keyValue.value.uint);
+  }
+}
+
 export class ReferenceClient {
   appId: bigint;
   algorand: AlgorandClient;
@@ -251,23 +269,19 @@ export class ReferenceClient {
 
   state = {
     keys: {
-      globalKey: async () => {
+      globalKey: async (): Promise<uint64> => {
         const b64Key = Buffer.from("globalKey").toString("base64");
 
-        const result = await this.algorand.client.algod
-          .getApplicationByID(Number(this.appId))
-          .do();
-
-        const keyValue = result.params["global-state"].find(
-          (s: any) => s.key === b64Key
-        );
-
-        return BigInt(keyValue.value.uint);
+        return getGlobalStateValue(
+          b64Key,
+          this.algorand.client.algod,
+          this.appId
+        ) as Promise<uint64>;
       },
     },
     maps: {
       globalMap: {
-        value: async (keyValue: string) => {
+        value: async (keyValue: string): Promise<UnnamedType1> => {
           const encodedKey = algosdk.ABIType.from("string").encode(keyValue);
 
           const key = Buffer.concat([
@@ -277,16 +291,12 @@ export class ReferenceClient {
 
           const b64Key = Buffer.from(key).toString("base64");
 
-          const result = await this.algorand.client.algod
-            .getApplicationByID(Number(this.appId))
-            .do();
-
-          const value = result.params["global-state"].find(
-            (s: any) => s.key === b64Key
-          );
-
           return rawValueToUnnamedType1(
-            Buffer.from(value.value.bytes, "base64")
+            (await getGlobalStateValue(
+              b64Key,
+              this.algorand.client.algod,
+              this.appId
+            )) as Uint8Array
           );
         },
       },

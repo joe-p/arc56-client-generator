@@ -299,3 +299,21 @@ private async executeWithErrorParsing(group: AlgokitComposer) {
     throw e;
   }
 }`;
+
+export const getGlobalStateValue = `async function getGlobalStateValue(
+  b64Key: string,
+  algod: algosdk.Algodv2,
+  appId: bigint
+) {
+  const result = await algod.getApplicationByID(Number(appId)).do();
+
+  const keyValue = result.params["global-state"].find(
+    (s: any) => s.key === b64Key
+  );
+
+  if (keyValue.value.type === 1) {
+    return new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"));
+  } else {
+    return BigInt(keyValue.value.uint);
+  }
+}`;

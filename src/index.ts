@@ -234,7 +234,6 @@ class ARC56Generator {
     Object.keys(structFields).forEach((sf) => {
       if (typeof structFields[sf] === "string") {
         lines.push(`${sf}: decoded${prefix}[${index}],`);
-        index++;
       } else {
         lines.push(`${sf}: {`);
         this.getLinesForArrayToStruct(
@@ -244,6 +243,7 @@ class ARC56Generator {
           `${prefix}[${index}]`
         );
       }
+      index++;
     });
     if (prefix) lines.push("},");
     else lines.push("}");
@@ -465,6 +465,100 @@ class ARC56Generator {
     return lines;
   }
 
+  getTypeScriptType(type: string): string {
+    if (this.arc56.structs[type]) {
+      if (type.includes(" ")) {
+        return `CustomType${this.customTypes.findIndex((ct) => ct === type)}`;
+      }
+
+      return type;
+    }
+
+    return type;
+  }
+
+  getABIType(type: string): string {
+    if (this.arc56.structs[type]) {
+      return this.structFieldsToABIType(this.arc56.structs[type]);
+    }
+
+    return type;
+  }
+
+  getStateLines(): string[] {
+    if (Object.keys(this.arc56.state).length === 0) return [];
+    const lines = ["state = {"];
+
+    if (Object.keys(this.arc56.state.keys).length > 0) {
+      lines.push("keys: {");
+
+      // TODO: Box and Local
+      // TODO: Custom key/value types
+      (["global"] as "global"[]).forEach((storageType) => {
+        this.arc56.state.keys[storageType].forEach((k) => {
+          lines.push(
+            `${k.name}: async (): Promise<${this.getTypeScriptType(k.valueType)}> => {`
+          );
+
+          lines.push(`return getGlobalStateValue(
+            "${k.key}", 
+            this.algorand.client.algod,
+            this.appId
+          ) as Promise<${this.getTypeScriptType(k.valueType)}>;`);
+          lines.push("},");
+        });
+      });
+
+      lines.push("},");
+    }
+
+    if (Object.keys(this.arc56.state.maps).length > 0) {
+      lines.push("maps: {");
+      lines.push("values: {");
+
+      // TODO: Box and Local
+      // TODO: Custom key/value types
+      (["global"] as "global"[]).forEach((storageType) => {
+        this.arc56.state.maps[storageType].forEach((m) => {
+          lines.push(
+            `${m.name}: async (key: ${this.getTypeScriptType(m.keyType)}): Promise<${this.getTypeScriptType(m.valueType)}> => {`
+          );
+
+          lines.push(
+            `const encodedKey = algosdk.ABIType.from("${this.getABIType(m.keyType)}").encode(key);`
+          );
+
+          if (m.prefix) {
+            lines.push(
+              `const fullKey = Buffer.concat([Buffer.from("${m.prefix}"), Buffer.from(encodedKey)]);`
+            );
+          }
+
+          // TODO: Non-struct value
+          if (this.arc56.structs[m.valueType]) {
+            lines.push(
+              `return rawValueTo${this.getTypeScriptType(m.valueType)}(
+                (await getGlobalStateValue(
+                  Buffer.from(${m.prefix ? "fullKey" : "encodedKey"}).toString("base64"),
+                  this.algorand.client.algod,
+                  this.appId
+                )) as Uint8Array
+              );`
+            );
+          }
+
+          lines.push("},");
+        });
+      });
+
+      lines.push("},");
+    }
+    lines.push("},");
+    lines.push("};");
+
+    return lines;
+  }
+
   async generate() {
     const content = `
   ${staticContent.importsAndMethodParams}
@@ -472,6 +566,8 @@ class ARC56Generator {
   const ARC56_JSON = \`${JSON.stringify(this.arc56)}\`
 
   ${staticContent.arc56TypeDefinitions}
+
+  ${staticContent.getGlobalStateValue}
   
   ${this.getABITypeLines().join("\n")}
   
@@ -494,6 +590,8 @@ class ARC56Generator {
   ${this.getCallLines().join("\n")}
 
   ${this.getCreateLines().join("\n")}
+
+  ${this.getStateLines().join("\n")}
   }
   `.trim();
 
