@@ -242,10 +242,7 @@ type bytes = string;
 type uint16 = bigint;
 
 // Type definitions for ARC56 structs
-export type CustomType0 = {
-  foo: uint16;
-  bar: uint16;
-};
+
 export type Outputs = {
   sum: uint64;
   difference: uint64;
@@ -295,11 +292,11 @@ export class ARC56Test {
       return await group.execute();
     } catch (e) {
       const txId = JSON.stringify(e).match(
-        /(?<=TransactionPool.Remember: transaction )S+(?=:)/
+        /(?<=TransactionPool.Remember: transaction )S+(?=:)/,
       )?.[0];
 
       const appId = BigInt(
-        JSON.stringify(e).match(/(?<=Details: app=)d+/)?.[0] || ""
+        JSON.stringify(e).match(/(?<=Details: app=)d+/)?.[0] || "",
       );
 
       const pc = Number(JSON.stringify(e).match(/(?<=pc=)d+/)?.[0] || "");
@@ -310,12 +307,12 @@ export class ARC56Test {
 
       // TODO: Use our own source map we got during create if we have one
       const errorMessage = this.arc56.sourceInfo?.find((s) =>
-        s?.pc?.includes(pc)
+        s?.pc?.includes(pc),
       )?.errorMessage;
 
       if (errorMessage) {
         throw Error(
-          `Runtime error when executing ${this.arc56.name} (appId: ${this.appId}) in transaction ${txId}: ${errorMessage}`
+          `Runtime error when executing ${this.arc56.name} (appId: ${this.appId}) in transaction ${txId}: ${errorMessage}`,
         );
       }
 
@@ -323,9 +320,109 @@ export class ARC56Test {
     }
   }
 
+  private getABITypeFromStructFields(structFields: any): string {
+    const typesArray: any[] = [];
+
+    for (const key in structFields) {
+      if (typeof structFields[key] === "object") {
+        typesArray.push(this.getABITypeFromStructFields(structFields[key]));
+      } else {
+        typesArray.push(structFields[key]);
+      }
+    }
+
+    return JSON.stringify(typesArray)
+      .replace(/"/g, "")
+      .replace(/\]/g, ")")
+      .replace(/\[/g, "(");
+  }
+
+  private getABIType(type: string) {
+    if (this.arc56.structs[type]) {
+      return this.getABITypeFromStructFields(this.arc56.structs[type]);
+    }
+
+    return type;
+  }
+
+  private getABIEncodedValue(
+    value: algosdk.ABIValue,
+    type: string,
+  ): Uint8Array {
+    if (type === "bytes") return Buffer.from(value as string);
+    const abiType = this.getABIType(type);
+
+    return algosdk.ABIType.from(abiType).encode(value);
+  }
+
+  private getObjectFromStructFieldsAndArray(
+    structFields: any,
+    valuesArray: any[],
+  ): any {
+    const obj: any = {};
+
+    for (const key in structFields) {
+      if (
+        typeof structFields[key] === "object" &&
+        !Array.isArray(structFields[key])
+      ) {
+        obj[key] = this.getObjectFromStructFieldsAndArray(
+          structFields[key],
+          valuesArray.shift(),
+        );
+      } else {
+        obj[key] = valuesArray.shift();
+      }
+    }
+
+    return obj;
+  }
+
+  /** Get the typescript value, which may be the ABIValue or the struct */
+  private getTypeScriptValue(type: string, value: Uint8Array): any {
+    if (type === "bytes") return Buffer.from(value).toString();
+    const abiType = this.getABIType(type);
+
+    const abiValue = algosdk.ABIType.from(abiType).decode(value);
+
+    if (this.arc56.structs[type]) {
+      return this.getObjectFromStructFieldsAndArray(
+        this.arc56.structs[type],
+        abiValue as algosdk.ABIValue[],
+      );
+    }
+
+    return abiValue;
+  }
+
+  private async getGlobalStateValue(
+    b64Key: string,
+    type: string,
+  ): Promise<any> {
+    const result = await this.algorand.client.algod
+      .getApplicationByID(Number(this.appId))
+      .do();
+
+    const keyValue = result.params["global-state"].find(
+      (s: any) => s.key === b64Key,
+    );
+
+    if (keyValue.value.type === 1) {
+      return this.getTypeScriptValue(
+        type,
+        new Uint8Array(Buffer.from(keyValue.value.bytes, "base64")),
+      );
+    } else {
+      return this.getTypeScriptValue(
+        type,
+        algosdk.encodeUint64(keyValue.value.uint),
+      );
+    }
+  }
+
   private getABIValuesFromStructFieldsAndObject(
     structFields: any,
-    obj: any
+    obj: any,
   ): algosdk.ABIValue[] {
     const valuesArray: any[] = [];
 
@@ -337,8 +434,8 @@ export class ARC56Test {
         valuesArray.push(
           this.getABIValuesFromStructFieldsAndObject(
             structFields[key],
-            obj[key]
-          )
+            obj[key],
+          ),
         );
       } else {
         valuesArray.push(obj[key]);
@@ -353,7 +450,7 @@ export class ARC56Test {
     if (this.arc56.structs[type]) {
       return this.getABIValuesFromStructFieldsAndObject(
         this.arc56.structs[type],
-        value
+        value,
       );
     }
 
@@ -363,15 +460,15 @@ export class ARC56Test {
   async compileProgram(
     algorand: AlgorandClient,
     program: "clear" | "approval",
-    templateVars: TemplateVariables
+    templateVars: TemplateVariables,
   ) {
     let tealString = Buffer.from(
       this.arc56.source![program],
-      "base64"
+      "base64",
     ).toString();
     tealString = tealString.replace(
       /pushint TMPL_someNumber/g,
-      `pushint ${templateVars["someNumber"].toString()}`
+      `pushint ${templateVars["someNumber"].toString()}`,
     );
     const result = await algorand.client.algod.compile(tealString).do();
     return new Uint8Array(Buffer.from(result.result, "base64"));
@@ -415,7 +512,7 @@ export class ARC56Test {
   call = (methodParams: MethodParams = {}) => {
     return {
       foo: async (
-        inputs: Inputs
+        inputs: Inputs,
       ): Promise<{
         result: SendAtomicTransactionComposerResults;
         returnValue: Outputs;
@@ -431,7 +528,7 @@ export class ARC56Test {
           result,
           returnValue: this.getTypeScriptValue(
             "Outputs",
-            result.returns![0].rawReturnValue!
+            result.returns![0].rawReturnValue!,
           ),
         };
       },
@@ -439,7 +536,7 @@ export class ARC56Test {
   };
 
   create = (
-    methodParams: MethodParams & { templateVariables: TemplateVariables }
+    methodParams: MethodParams & { templateVariables: TemplateVariables },
   ) => {
     return {
       createApplication: async (): Promise<{
@@ -450,7 +547,7 @@ export class ARC56Test {
       }> => {
         if (this.appId !== 0n) {
           throw Error(
-            `Create was called but the app has already been created: ${this.appId.toString()}`
+            `Create was called but the app has already been created: ${this.appId.toString()}`,
           );
         }
 
@@ -466,12 +563,12 @@ export class ARC56Test {
           approvalProgram: await this.compileProgram(
             this.algorand,
             "approval",
-            methodParams.templateVariables
+            methodParams.templateVariables,
           ),
           clearProgram: await this.compileProgram(
             this.algorand,
             "clear",
-            methodParams.templateVariables
+            methodParams.templateVariables,
           ),
           ...this.params(methodParams).createApplication(),
         });
@@ -491,115 +588,10 @@ export class ARC56Test {
     };
   };
 
-  private getABITypeFromStructFields(structFields: any): string {
-    const typesArray: any[] = [];
-
-    for (const key in structFields) {
-      if (typeof structFields[key] === "object") {
-        typesArray.push(this.getABITypeFromStructFields(structFields[key]));
-      } else {
-        typesArray.push(structFields[key]);
-      }
-    }
-
-    return JSON.stringify(typesArray)
-      .replace(/"/g, "")
-      .replace(/\]/g, ")")
-      .replace(/\[/g, "(");
-  }
-
-  private getABIType(type: string) {
-    if (this.arc56.structs[type]) {
-      return this.getABITypeFromStructFields(this.arc56.structs[type]);
-    }
-
-    return type;
-  }
-
-  private getABIEncodedValue(
-    value: algosdk.ABIValue,
-    type: string
-  ): Uint8Array {
-    if (type === "bytes") return Buffer.from(value as string);
-    const abiType = this.getABIType(type);
-
-    return algosdk.ABIType.from(abiType).encode(value);
-  }
-
-  private getObjectFromStructFieldsAndArray(
-    structFields: any,
-    valuesArray: any[]
-  ): any {
-    const obj: any = {};
-
-    for (const key in structFields) {
-      if (
-        typeof structFields[key] === "object" &&
-        !Array.isArray(structFields[key])
-      ) {
-        obj[key] = this.getObjectFromStructFieldsAndArray(
-          structFields[key],
-          valuesArray.shift()
-        );
-      } else {
-        obj[key] = valuesArray.shift();
-      }
-    }
-
-    return obj;
-  }
-
-  /** Get the typescript value, which may be the ABIValue or the struct */
-  private getTypeScriptValue(type: string, value: Uint8Array): any {
-    if (type === "bytes") return Buffer.from(value).toString();
-    const abiType = this.getABIType(type);
-
-    const abiValue = algosdk.ABIType.from(abiType).decode(value);
-
-    if (this.arc56.structs[type]) {
-      return this.getObjectFromStructFieldsAndArray(
-        this.arc56.structs[type],
-        abiValue as algosdk.ABIValue[]
-      );
-    }
-
-    return abiValue;
-  }
-
-  private async getGlobalStateValue(
-    b64Key: string,
-    algod: algosdk.Algodv2,
-    appId: bigint,
-    type: string
-  ): Promise<any> {
-    const result = await algod.getApplicationByID(Number(appId)).do();
-
-    const keyValue = result.params["global-state"].find(
-      (s: any) => s.key === b64Key
-    );
-
-    if (keyValue.value.type === 1) {
-      return this.getTypeScriptValue(
-        type,
-        new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"))
-      );
-    } else {
-      return this.getTypeScriptValue(
-        type,
-        algosdk.encodeUint64(keyValue.value.uint)
-      );
-    }
-  }
-
   state = {
     keys: {
       globalKey: async (): Promise<uint64> => {
-        return await this.getGlobalStateValue(
-          "Z2xvYmFsS2V5",
-          this.algorand.client.algod,
-          this.appId,
-          "uint64"
-        );
+        return await this.getGlobalStateValue("Z2xvYmFsS2V5", "uint64");
       },
     },
     maps: {
@@ -607,14 +599,11 @@ export class ARC56Test {
         value: async (key: string): Promise<{ foo: uint16; bar: uint16 }> => {
           const encodedKey = Buffer.concat([
             Buffer.from("p"),
-            Buffer.from(this.getABIEncodedValue(key, "string")),
+            this.getABIEncodedValue(key, "string"),
           ]);
-
           return await this.getGlobalStateValue(
             Buffer.from(encodedKey).toString("base64"),
-            this.algorand.client.algod,
-            this.appId,
-            "{ foo: uint16; bar: uint16 }"
+            "{ foo: uint16; bar: uint16 }",
           );
         },
       },
@@ -627,3 +616,4 @@ export class ARC56Test {
     },
   };
 }
+

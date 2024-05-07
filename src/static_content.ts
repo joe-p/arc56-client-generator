@@ -377,11 +377,9 @@ private getTypeScriptValue(type: string, value: Uint8Array): any {
 
 private async getGlobalStateValue(
   b64Key: string,
-  algod: algosdk.Algodv2,
-  appId: bigint,
   type: string
 ): Promise<any> {
-  const result = await algod.getApplicationByID(Number(appId)).do();
+  const result = await this.algorand.client.algod.getApplicationByID(Number(this.appId)).do();
 
   const keyValue = result.params["global-state"].find(
     (s: any) => s.key === b64Key

@@ -327,8 +327,6 @@ class ARC56Generator {
 
           lines.push(`return await this.getGlobalStateValue(
             "${k.key}",
-            this.algorand.client.algod,
-            this.appId,
             "${k.valueType}"
           );`);
           lines.push("},");
@@ -362,8 +360,6 @@ class ARC56Generator {
 
           lines.push(`return await this.getGlobalStateValue(
             Buffer.from(encodedKey).toString("base64"),
-            this.algorand.client.algod,
-            this.appId,
             "${m.valueType}"
           );`);
 
