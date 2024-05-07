@@ -12,7 +12,6 @@
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^6.0.2",
     "algosdk": "^2.7.0",
-    "nunjucks": "^3.2.4",
     "prettier": "^3.2.5"
   }
 }
