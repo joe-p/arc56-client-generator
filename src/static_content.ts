@@ -298,13 +298,89 @@ private async executeWithErrorParsing(group: AlgokitComposer) {
 
     throw e;
   }
-}`;
+}
 
-export const getGlobalStateValue = `async function getGlobalStateValue(
+private getABITypeFromStructFields(structFields: any): string {
+  const typesArray: any[] = [];
+
+  for (const key in structFields) {
+    if (typeof structFields[key] === "object") {
+      typesArray.push(this.getABITypeFromStructFields(structFields[key]));
+    } else {
+      typesArray.push(structFields[key]);
+    }
+  }
+
+  return JSON.stringify(typesArray)
+    .replace(/"/g, "")
+    .replace(/\\]/g, ")")
+    .replace(/\\[/g, "(");
+}
+
+private getABIType(type: string) {
+  if (this.arc56.structs[type]) {
+    return this.getABITypeFromStructFields(this.arc56.structs[type]);
+  }
+
+  return type;
+}
+
+private getABIEncodedValue(
+  value: algosdk.ABIValue,
+  type: string
+): Uint8Array {
+  if (type === "bytes") return Buffer.from(value as string);
+  const abiType = this.getABIType(type);
+
+  return algosdk.ABIType.from(abiType).encode(value);
+}
+
+private getObjectFromStructFieldsAndArray(
+  structFields: any,
+  valuesArray: any[]
+): any {
+  const obj: any = {};
+
+  for (const key in structFields) {
+    if (
+      typeof structFields[key] === "object" &&
+      !Array.isArray(structFields[key])
+    ) {
+      obj[key] = this.getObjectFromStructFieldsAndArray(
+        structFields[key],
+        valuesArray.shift()
+      );
+    } else {
+      obj[key] = valuesArray.shift();
+    }
+  }
+
+  return obj;
+}
+
+/** Get the typescript value, which may be the ABIValue or the struct */
+private getTypeScriptValue(type: string, value: Uint8Array): any {
+  if (type === "bytes") return Buffer.from(value).toString();
+  const abiType = this.getABIType(type);
+
+  const abiValue = algosdk.ABIType.from(abiType).decode(value);
+
+  if (this.arc56.structs[type]) {
+    return this.getObjectFromStructFieldsAndArray(
+      this.arc56.structs[type],
+      abiValue as algosdk.ABIValue[]
+    );
+  }
+
+  return abiValue;
+}
+
+private async getGlobalStateValue(
   b64Key: string,
   algod: algosdk.Algodv2,
-  appId: bigint
-) {
+  appId: bigint,
+  type: string
+): Promise<any> {
   const result = await algod.getApplicationByID(Number(appId)).do();
 
   const keyValue = result.params["global-state"].find(
@@ -312,8 +388,52 @@ export const getGlobalStateValue = `async function getGlobalStateValue(
   );
 
   if (keyValue.value.type === 1) {
-    return new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"));
+    return this.getTypeScriptValue(
+      type,
+      new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"))
+    );
   } else {
-    return BigInt(keyValue.value.uint);
+    return this.getTypeScriptValue(
+      type,
+      algosdk.encodeUint64(keyValue.value.uint)
+    );
   }
-}`;
+}
+
+private getABIValuesFromStructFieldsAndObject(
+  structFields: any,
+  obj: any
+): algosdk.ABIValue[] {
+  const valuesArray: any[] = [];
+
+  for (const key in structFields) {
+    if (
+      typeof structFields[key] === "object" &&
+      !Array.isArray(structFields[key])
+    ) {
+      valuesArray.push(
+        this.getABIValuesFromStructFieldsAndObject(
+          structFields[key],
+          obj[key]
+        )
+      );
+    } else {
+      valuesArray.push(obj[key]);
+    }
+  }
+
+  return valuesArray;
+}
+
+private getABIValue(type: string, value: any): algosdk.ABIValue {
+  if (type === "bytes") return value;
+  if (this.arc56.structs[type]) {
+    return this.getABIValuesFromStructFieldsAndObject(
+      this.arc56.structs[type],
+      value
+    );
+  }
+
+  return value;
+}
+`;

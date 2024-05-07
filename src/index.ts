@@ -99,18 +99,9 @@ class ARC56Generator {
   getStructTypeLines() {
     if (Object.keys(this.arc56.structs).length === 0) return [];
 
-    const lines = ["// Type definitions for ARC56 structs"];
-
-    let customTypeCounter = 0;
-
     const structLines = Object.keys(this.arc56.structs).map((structName) => {
       if (structName.includes(" ")) {
-        this.customTypes.push(structName);
-        return `export type CustomType${customTypeCounter++} = ${JSON.stringify(
-          this.arc56.structs[structName],
-          null,
-          2
-        )}`.replace(/"/g, "");
+        return "";
       } else {
         return `export type ${structName} = ${JSON.stringify(
           this.arc56.structs[structName],
@@ -120,7 +111,7 @@ class ARC56Generator {
       }
     });
 
-    return lines.concat(structLines);
+    return ["// Type definitions for ARC56 structs"].concat(structLines);
   }
 
   getTemplateVariableTypeLines() {
@@ -141,145 +132,6 @@ class ARC56Generator {
     });
 
     lines.push("}");
-
-    return lines;
-  }
-
-  structFieldsToTypeScriptType(fields: StructFields): string {
-    const types: string[] = [];
-    Object.values(fields).forEach((sf) => {
-      if (typeof sf === "string") types.push(sf);
-      else types.push(this.structFieldsToTypeScriptType(sf));
-    });
-
-    return `[${types.join(",")}]`;
-  }
-
-  structFieldsToABIType(fields: StructFields): string {
-    return this.structFieldsToTypeScriptType(fields)
-      .replace(/ /g, "")
-      .replace(/\[/g, "(")
-      .replace(/]/g, ")");
-  }
-
-  // Thanks to Claude 3 Opus...
-  structFieldsToNestedArray(fields: StructFields, prefix: string = ""): string {
-    function processObject(obj: StructFields, currentPrefix: string): string {
-      const keys = Object.keys(obj);
-      if (keys.length === 0) {
-        return "";
-      }
-
-      let result = "";
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        const value = obj[key];
-
-        const newPrefix = currentPrefix ? `${currentPrefix}.${key}` : key;
-
-        if (typeof value === "object" && value !== null) {
-          result += `[${processObject(value, newPrefix)}]`;
-        } else {
-          result += newPrefix;
-        }
-
-        if (i < keys.length - 1) {
-          result += ",";
-        }
-      }
-
-      return result;
-    }
-
-    return `[${processObject(fields, prefix)}]`;
-  }
-
-  getStructToArrayLines() {
-    const lines: string[] = [
-      "// Convert ARC56 structs to arrays primarily for passing as methodArgs",
-    ];
-
-    Object.keys(this.arc56.structs).forEach((structName) => {
-      let typeName = structName;
-      if (structName.includes(" ")) {
-        typeName = `CustomType${this.customTypes.findIndex((ct) => ct === structName)}`;
-      }
-
-      lines.push(
-        `export function ${typeName}ToArray(${typeName.toLowerCase()}: ${typeName}): ${this.structFieldsToTypeScriptType(
-          this.arc56.structs[structName]
-        )} {`
-      );
-
-      lines.push(
-        `return ${this.structFieldsToNestedArray(
-          this.arc56.structs[structName],
-          typeName.toLocaleLowerCase()
-        )}`
-      );
-      lines.push("}\n");
-    });
-
-    return lines;
-  }
-
-  getLinesForArrayToStruct(
-    structFields: StructFields,
-    lines: string[],
-    prefix = ""
-  ) {
-    let index = 0;
-
-    if (prefix === "") lines.push("return {");
-    Object.keys(structFields).forEach((sf) => {
-      if (typeof structFields[sf] === "string") {
-        lines.push(`${sf}: decoded${prefix}[${index}],`);
-      } else {
-        lines.push(`${sf}: {`);
-        this.getLinesForArrayToStruct(
-          // @ts-expect-error TODO: Fix this
-          structFields[sf],
-          lines,
-          `${prefix}[${index}]`
-        );
-      }
-      index++;
-    });
-    if (prefix) lines.push("},");
-    else lines.push("}");
-  }
-
-  getBinaryToStructLines() {
-    if (Object.keys(this.arc56.structs).length === 0) return [];
-
-    const lines = ["// Binary To Structs"];
-
-    Object.keys(this.arc56.structs).forEach((structName) => {
-      let typeName = structName;
-      if (structName.includes(" ")) {
-        typeName = `CustomType${this.customTypes.findIndex((ct) => ct === structName)}`;
-      }
-
-      lines.push(
-        `export function rawValueTo${typeName}(rawValue: Uint8Array): ${typeName} {`
-      );
-
-      const abiType = this.structFieldsToABIType(
-        this.arc56.structs[structName]
-      );
-
-      const tsType = this.structFieldsToTypeScriptType(
-        this.arc56.structs[structName]
-      );
-
-      lines.push(
-        `const decoded = algosdk.ABITupleType.from("${abiType}").decode(rawValue).valueOf() as ${tsType}\n`
-      );
-
-      this.getLinesForArrayToStruct(this.arc56.structs[structName], lines);
-
-      lines.push("}\n");
-    });
 
     return lines;
   }
@@ -330,7 +182,7 @@ class ARC56Generator {
 
       return {
         result,
-        returnValue: rawValueToOutputs(result.returns![0].rawReturnValue!),
+        returnValue: this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", result.returns![0].rawReturnValue!),
       };`;
 
       lines.push(...logic.split("\n"));
@@ -359,7 +211,7 @@ class ARC56Generator {
     this.arc56.methods.forEach((m) => {
       if (m.actions.create.length === 0) return;
       lines.push(
-        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct || m.returns.type}; appId: bigint; appAddress: string}> => {`
+        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
       );
 
       const logic = `
@@ -406,7 +258,7 @@ class ARC56Generator {
 
       if (m.returns.type !== "void") {
         lines.push(
-          "returnValue: rawValueToOutputs(result.returns![0].rawReturnValue!),"
+          `returnValue: this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", result.returns![0].rawReturnValue!)`
         );
       } else {
         lines.push("returnValue: undefined,");
@@ -432,11 +284,7 @@ class ARC56Generator {
 
       const args = m.args
         .map((a) => {
-          if (a.struct) {
-            return `${a.struct}ToArray(${a.name})`;
-          } else {
-            return a.name;
-          }
+          return `this.getABIValue("${a.struct ?? a.type}", ${a.name})`;
         })
         .join(", ");
 
@@ -465,26 +313,6 @@ class ARC56Generator {
     return lines;
   }
 
-  getTypeScriptType(type: string): string {
-    if (this.arc56.structs[type]) {
-      if (type.includes(" ")) {
-        return `CustomType${this.customTypes.findIndex((ct) => ct === type)}`;
-      }
-
-      return type;
-    }
-
-    return type;
-  }
-
-  getABIType(type: string): string {
-    if (this.arc56.structs[type]) {
-      return this.structFieldsToABIType(this.arc56.structs[type]);
-    }
-
-    return type;
-  }
-
   getStateLines(): string[] {
     if (Object.keys(this.arc56.state).length === 0) return [];
     const lines = ["state = {"];
@@ -493,18 +321,16 @@ class ARC56Generator {
       lines.push("keys: {");
 
       // TODO: Box and Local
-      // TODO: Custom key/value types
       (["global"] as "global"[]).forEach((storageType) => {
         this.arc56.state.keys[storageType].forEach((k) => {
-          lines.push(
-            `${k.name}: async (): Promise<${this.getTypeScriptType(k.valueType)}> => {`
-          );
+          lines.push(`${k.name}: async (): Promise<${k.valueType}> => {`);
 
-          lines.push(`return getGlobalStateValue(
-            "${k.key}", 
+          lines.push(`return await this.getGlobalStateValue(
+            "${k.key}",
             this.algorand.client.algod,
-            this.appId
-          ) as Promise<${this.getTypeScriptType(k.valueType)}>;`);
+            this.appId,
+            "${k.valueType}"
+          );`);
           lines.push("},");
         });
       });
@@ -516,37 +342,30 @@ class ARC56Generator {
       lines.push("maps: {");
 
       // TODO: Box and Local
-      // TODO: Custom key/value types
       (["global"] as "global"[]).forEach((storageType) => {
         this.arc56.state.maps[storageType].forEach((m) => {
           lines.push(`${m.name}: {`);
 
           lines.push(
-            `value: async (key: ${this.getTypeScriptType(m.keyType)}): Promise<${this.getTypeScriptType(m.valueType)}> => {`
-          );
-
-          lines.push(
-            `const encodedKey = algosdk.ABIType.from("${this.getABIType(m.keyType)}").encode(key);`
+            `value: async (key: ${m.keyType}): Promise<${m.valueType}> => {`
           );
 
           if (m.prefix) {
             lines.push(
-              `const fullKey = Buffer.concat([Buffer.from("${m.prefix}"), Buffer.from(encodedKey)]);`
+              `const encodedKey = Buffer.concat([Buffer.from("${m.prefix}"), this.getABIEncodedValue(key, "${m.keyType}")]);`
+            );
+          } else {
+            lines.push(
+              `const encodedKey = this.getABIEncodedValue(key, "${m.keyType}");`
             );
           }
 
-          // TODO: Non-struct value
-          if (this.arc56.structs[m.valueType]) {
-            lines.push(
-              `return rawValueTo${this.getTypeScriptType(m.valueType)}(
-                (await getGlobalStateValue(
-                  Buffer.from(${m.prefix ? "fullKey" : "encodedKey"}).toString("base64"),
-                  this.algorand.client.algod,
-                  this.appId
-                )) as Uint8Array
-              );`
-            );
-          }
+          lines.push(`return await this.getGlobalStateValue(
+            Buffer.from(encodedKey).toString("base64"),
+            this.algorand.client.algod,
+            this.appId,
+            "${m.valueType}"
+          );`);
 
           lines.push("},");
           lines.push("},");
@@ -559,6 +378,30 @@ class ARC56Generator {
     return lines;
   }
 
+  getDecodeReturnValueLines() {
+    if (this.arc56.methods.every((m) => m.returns.type === "void")) return [];
+
+    const lines = ["decodeReturnValue = {"];
+
+    this.arc56.methods.forEach((m) => {
+      if (m.returns.type === "void") return;
+
+      lines.push(
+        `${m.name}: (rawValue: Uint8Array): ${m.returns.struct ?? m.returns.type} => {`
+      );
+
+      lines.push(
+        `return this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", rawValue);`
+      );
+
+      lines.push("},");
+    });
+
+    lines.push("};");
+
+    return lines;
+  }
+
   async generate() {
     const content = `
   ${staticContent.importsAndMethodParams}
@@ -566,18 +409,12 @@ class ARC56Generator {
   const ARC56_JSON = \`${JSON.stringify(this.arc56)}\`
 
   ${staticContent.arc56TypeDefinitions}
-
-  ${staticContent.getGlobalStateValue}
   
   ${this.getABITypeLines().join("\n")}
   
   ${this.getStructTypeLines().join("\n")}
   
   ${this.getTemplateVariableTypeLines().join("\n")}
-
-  ${this.getStructToArrayLines().join("\n")}
-
-  ${this.getBinaryToStructLines().join("\n")}
 
   export class ${this.arc56.name} {
 
@@ -592,6 +429,8 @@ class ARC56Generator {
   ${this.getCreateLines().join("\n")}
 
   ${this.getStateLines().join("\n")}
+
+  ${this.getDecodeReturnValueLines().join("\n")}
   }
   `.trim();
 
