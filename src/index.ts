@@ -440,6 +440,49 @@ class ARC56Generator {
     return lines;
   }
 
+  getParamsLines() {
+    const lines = ["params = (methodParams?: MethodParams) => {", "return {"];
+
+    this.arc56.methods.forEach((m) => {
+      lines.push(
+        `${m.name}: (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): MethodCallParams => {`
+      );
+
+      const args = m.args
+        .map((a) => {
+          if (a.struct) {
+            return `${a.struct}ToArray(${a.name})`;
+          } else {
+            return a.name;
+          }
+        })
+        .join(", ");
+
+      const logic = `
+      const sender = methodParams?.sender ?? this.defaultSender;
+
+      if (sender === undefined) {
+        throw new Error("No sender provided");
+      }
+
+      return {
+        sender,
+        appId: this.appId,
+        method: this.contract.getMethodByName("${m.name}")!,
+        args: [${args}],
+        ...methodParams,
+      };`;
+
+      lines.push(...logic.split("\n"));
+      lines.push("},");
+    });
+
+    lines.push("};");
+
+    lines.push("};");
+    return lines;
+  }
+
   async generate() {
     const content = `
   ${staticContent.importsAndMethodParams}
@@ -467,6 +510,8 @@ class ARC56Generator {
   ${this.getCallLines().join("\n")}
 
   ${this.getCreateLines().join("\n")}
+
+  ${this.getParamsLines().join("\n")}
   }
   `.trim();
 
