@@ -311,6 +311,135 @@ class ARC56Generator {
     return lines;
   }
 
+  getCallLines() {
+    const lines = ["call = (methodParams: MethodParams = {}) => {", "return {"];
+
+    this.arc56.methods.forEach((m) => {
+      if (m.actions.call.length === 0) return;
+      lines.push(
+        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct || m.returns.type}}> => {`
+      );
+
+      const logic = `
+      const sender = methodParams?.sender ?? this.defaultSender;
+
+      if (sender === undefined) {
+        throw new Error("No sender provided");
+      }
+
+      const group = this.algorand.newGroup();
+      group.addMethodCall({
+        sender,
+        appId: this.appId,
+        method: this.contract.getMethodByName("${m.name}")!,
+        args: [InputsToArray(inputs)],
+        ...methodParams,
+      });
+
+      const result = await this.executeWithErrorParsing(group);
+
+      return {
+        result,
+        returnValue: rawValueToOutputs(result.returns![0].rawReturnValue!),
+      };`;
+
+      lines.push(...logic.split("\n"));
+      lines.push("},");
+    });
+
+    lines.push("};");
+
+    lines.push("};");
+    return lines;
+  }
+
+  getCreateLines() {
+    const lines: string[] = [];
+
+    if (this.arc56.templateVariables !== undefined) {
+      lines.push(
+        `create = (methodParams: MethodParams & { templateVariables: TemplateVariables }) => {`
+      );
+    } else {
+      lines.push(`create = (methodParams: MethodParams = {}) => {`);
+    }
+
+    lines.push(`return {`);
+
+    this.arc56.methods.forEach((m) => {
+      if (m.actions.create.length === 0) return;
+      lines.push(
+        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct || m.returns.type}; appId: bigint; appAddress: string}> => {`
+      );
+
+      const logic = `
+      if (this.appId !== 0n)
+        throw Error(
+          \`Create was called but the app has already been created: \${this.appId.toString()}\`
+        );
+
+      const sender = methodParams?.sender ?? this.defaultSender;
+
+      if (sender === undefined) {
+        throw new Error("No sender provided");
+      }
+
+      // TODO: fix bug in AlgorandClient with schema
+      const group = this.algorand.newGroup();
+      group.addMethodCall({
+        schema: {
+          globalByteSlices: this.arc56.state.schema.global.bytes,
+          globalUints: this.arc56.state.schema.global.ints,
+          localByteSlices: this.arc56.state.schema.local.bytes,
+          localUints: this.arc56.state.schema.local.ints,
+        },
+        approvalProgram: await this.compileProgram(
+          this.algorand,
+          "approval",
+          ${this.arc56.templateVariables === undefined ? "" : "methodParams.templateVariables"}
+        ),
+        clearProgram: await this.compileProgram(
+          this.algorand,
+          "clear",
+          ${this.arc56.templateVariables === undefined ? "" : "methodParams.templateVariables"}
+        ),
+        sender,
+        appId: this.appId,
+        method: this.contract.getMethodByName("${m.name}")!,
+        ...methodParams,
+      });
+
+      const result = await this.executeWithErrorParsing(group);
+
+      this.appId = BigInt(result.confirmations.at(-1)!.applicationIndex!);
+      this.appAddress = algosdk.getApplicationAddress(this.appId);
+
+      return {
+        appId: this.appId,
+        appAddress: this.appAddress,
+        result,
+        `.trim();
+
+      lines.push(...logic.split("\n"));
+
+      if (m.returns.type !== "void") {
+        lines.push(
+          "returnValue: rawValueToOutputs(result.returns![0].rawReturnValue!),"
+        );
+      } else {
+        lines.push("returnValue: undefined,");
+      }
+
+      lines.push("};");
+
+      lines.push("},");
+    });
+    lines.push("};");
+    lines.push("};");
+
+    return lines;
+  }
+
   async generate() {
     const content = `
   ${staticContent.importsAndMethodParams}
@@ -334,11 +463,20 @@ class ARC56Generator {
   ${staticContent.classContent}
 
   ${this.getCompileProgramLines().join("\n")}
+
+  ${this.getCallLines().join("\n")}
+
+  ${this.getCreateLines().join("\n")}
   }
   `.trim();
 
     // console.log(content);
-    console.log(await format(content, { parser: "typescript" }));
+    try {
+      console.log(await format(content, { parser: "typescript" }));
+    } catch (e) {
+      console.log(content);
+      throw e;
+    }
   }
 }
 
