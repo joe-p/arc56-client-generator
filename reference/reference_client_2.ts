@@ -239,12 +239,12 @@ export interface ARC56Contract {
 async function getGlobalStateValue(
   b64Key: string,
   algod: algosdk.Algodv2,
-  appId: bigint,
+  appId: bigint
 ) {
   const result = await algod.getApplicationByID(Number(appId)).do();
 
   const keyValue = result.params["global-state"].find(
-    (s: any) => s.key === b64Key,
+    (s: any) => s.key === b64Key
   );
 
   if (keyValue.value.type === 1) {
@@ -294,7 +294,7 @@ export function OutputsToArray(outputs: Outputs): [uint64, uint64] {
 }
 
 export function InputsToArray(
-  inputs: Inputs,
+  inputs: Inputs
 ): [[uint64, uint64], [uint64, uint64]] {
   return [
     [inputs.add.a, inputs.add.b],
@@ -371,11 +371,11 @@ export class ARC56Test {
       return await group.execute();
     } catch (e) {
       const txId = JSON.stringify(e).match(
-        /(?<=TransactionPool.Remember: transaction )S+(?=:)/,
+        /(?<=TransactionPool.Remember: transaction )S+(?=:)/
       )?.[0];
 
       const appId = BigInt(
-        JSON.stringify(e).match(/(?<=Details: app=)d+/)?.[0] || "",
+        JSON.stringify(e).match(/(?<=Details: app=)d+/)?.[0] || ""
       );
 
       const pc = Number(JSON.stringify(e).match(/(?<=pc=)d+/)?.[0] || "");
@@ -386,12 +386,12 @@ export class ARC56Test {
 
       // TODO: Use our own source map we got during create if we have one
       const errorMessage = this.arc56.sourceInfo?.find((s) =>
-        s?.pc?.includes(pc),
+        s?.pc?.includes(pc)
       )?.errorMessage;
 
       if (errorMessage) {
         throw Error(
-          `Runtime error when executing ${this.arc56.name} (appId: ${this.appId}) in transaction ${txId}: ${errorMessage}`,
+          `Runtime error when executing ${this.arc56.name} (appId: ${this.appId}) in transaction ${txId}: ${errorMessage}`
         );
       }
 
@@ -402,15 +402,15 @@ export class ARC56Test {
   async compileProgram(
     algorand: AlgorandClient,
     program: "clear" | "approval",
-    templateVars: TemplateVariables,
+    templateVars: TemplateVariables
   ) {
     let tealString = Buffer.from(
       this.arc56.source![program],
-      "base64",
+      "base64"
     ).toString();
     tealString = tealString.replace(
       /pushint TMPL_someNumber/g,
-      `pushint ${templateVars["someNumber"].toString()}`,
+      `pushint ${templateVars["someNumber"].toString()}`
     );
     const result = await algorand.client.algod.compile(tealString).do();
     return new Uint8Array(Buffer.from(result.result, "base64"));
@@ -454,7 +454,7 @@ export class ARC56Test {
   call = (methodParams: MethodParams = {}) => {
     return {
       foo: async (
-        inputs: Inputs,
+        inputs: Inputs
       ): Promise<{
         result: SendAtomicTransactionComposerResults;
         returnValue: Outputs;
@@ -475,7 +475,7 @@ export class ARC56Test {
   };
 
   create = (
-    methodParams: MethodParams & { templateVariables: TemplateVariables },
+    methodParams: MethodParams & { templateVariables: TemplateVariables }
   ) => {
     return {
       createApplication: async (): Promise<{
@@ -486,7 +486,7 @@ export class ARC56Test {
       }> => {
         if (this.appId !== 0n) {
           throw Error(
-            `Create was called but the app has already been created: ${this.appId.toString()}`,
+            `Create was called but the app has already been created: ${this.appId.toString()}`
           );
         }
 
@@ -502,12 +502,12 @@ export class ARC56Test {
           approvalProgram: await this.compileProgram(
             this.algorand,
             "approval",
-            methodParams.templateVariables,
+            methodParams.templateVariables
           ),
           clearProgram: await this.compileProgram(
             this.algorand,
             "clear",
-            methodParams.templateVariables,
+            methodParams.templateVariables
           ),
           ...this.params(methodParams).createApplication(),
         });
@@ -533,7 +533,7 @@ export class ARC56Test {
         return getGlobalStateValue(
           "Z2xvYmFsS2V5",
           this.algorand.client.algod,
-          this.appId,
+          this.appId
         ) as Promise<uint64>;
       },
     },
@@ -549,12 +549,17 @@ export class ARC56Test {
             (await getGlobalStateValue(
               Buffer.from(fullKey).toString("base64"),
               this.algorand.client.algod,
-              this.appId,
-            )) as Uint8Array,
+              this.appId
+            )) as Uint8Array
           );
         },
       },
     },
   };
-}
 
+  decodeReturnValue = {
+    foo(rawValue: Uint8Array): Outputs {
+      return rawValueToOutputs(rawValue);
+    },
+  };
+}
