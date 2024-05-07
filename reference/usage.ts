@@ -1,5 +1,11 @@
 import { ARC56Test, type Inputs } from "./reference_client_2";
-import { AlgorandClient, microAlgos } from "@algorandfoundation/algokit-utils";
+import {
+  AlgorandClient,
+  microAlgos,
+  Config,
+} from "@algorandfoundation/algokit-utils";
+
+Config.configure({ populateAppCallResources: true });
 
 async function main() {
   const algorand = AlgorandClient.defaultLocalNet();
@@ -96,6 +102,14 @@ async function main() {
     "globalMap -> foo",
     await appClient.state.maps.globalMap.value("foo")
   );
+
+  await algorand.send.payment({
+    sender: defaultSender,
+    receiver: appAddress,
+    amount: microAlgos(1_000_000),
+  });
+
+  await appClient.optIn().optInToApplication();
 }
 
 await main();

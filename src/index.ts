@@ -164,34 +164,63 @@ class ARC56Generator {
   }
 
   getCallLines() {
-    const lines = ["call = (methodParams: MethodParams = {}) => {", "return {"];
+    const lines: string[] = [];
 
-    this.arc56.methods.forEach((m) => {
-      if (m.actions.call.length === 0) return;
+    const ocMap = {
+      NoOp: "call",
+      OptIn: "optIn",
+      CloseOut: "closeOut",
+      ClearState: "clearState",
+      UpdateApplication: "update",
+      DeleteApplication: "delete",
+    };
+
+    (Object.keys(ocMap) as (keyof typeof ocMap)[]).forEach((oc) => {
+      const numMethods = this.arc56.methods.filter((m) =>
+        m.actions.call.includes(oc)
+      ).length;
+
+      if (numMethods === 0) return;
+
       lines.push(
-        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct || m.returns.type}}> => {`
+        `${ocMap[oc]} = (methodParams: MethodParams = {}) => {`,
+        "return {"
       );
 
-      const logic = `
+      this.arc56.methods.forEach((m) => {
+        if (!m.actions.call.includes(oc)) return;
+        lines.push(
+          `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct || m.returns.type}}> => {`
+        );
+
+        const logic = `
       const group = this.algorand.newGroup();
       group.addMethodCall({
         ...this.params(methodParams).${m.name}(${m.args.map((a) => a.name).join(",")}),
+        onComplete: algosdk.OnApplicationComplete.${oc}OC,
       });
 
       const result = await this.executeWithErrorParsing(group);
 
       return {
-        result,
-        returnValue: this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", result.returns![0].rawReturnValue!),
-      };`;
+        result,`;
 
-      lines.push(...logic.split("\n"));
-      lines.push("},");
+        lines.push(...logic.split("\n"));
+        if (m.returns.type !== "void") {
+          lines.push(
+            `returnValue: this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", result.returns![0].rawReturnValue!) };`
+          );
+        } else {
+          lines.push("returnValue: undefined, };");
+        }
+        lines.push("},");
+      });
+
+      lines.push("};");
+
+      lines.push("};");
     });
 
-    lines.push("};");
-
-    lines.push("};");
     return lines;
   }
 
@@ -200,10 +229,12 @@ class ARC56Generator {
 
     if (this.arc56.templateVariables !== undefined) {
       lines.push(
-        `create = (methodParams: MethodParams & { templateVariables: TemplateVariables }) => {`
+        `create = (methodParams: MethodParams & { templateVariables: TemplateVariables; onComplete?: algosdk.OnApplicationComplete }) => {`
       );
     } else {
-      lines.push(`create = (methodParams: MethodParams = {}) => {`);
+      lines.push(
+        `create = (methodParams: MethodParams & { onComplete?: algosdk.OnApplicationComplete } = {}) => {`
+      );
     }
 
     lines.push(`return {`);
@@ -221,7 +252,6 @@ class ARC56Generator {
         );
       }
 
-      // TODO: fix bug in AlgorandClient with schema
       const group = this.algorand.newGroup();
       group.addMethodCall({
         schema: {
