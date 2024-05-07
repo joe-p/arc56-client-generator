@@ -236,24 +236,6 @@ export interface ARC56Contract {
   }[];
 }
 
-async function getGlobalStateValue(
-  b64Key: string,
-  algod: algosdk.Algodv2,
-  appId: bigint
-) {
-  const result = await algod.getApplicationByID(Number(appId)).do();
-
-  const keyValue = result.params["global-state"].find(
-    (s: any) => s.key === b64Key
-  );
-
-  if (keyValue.value.type === 1) {
-    return new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"));
-  } else {
-    return BigInt(keyValue.value.uint);
-  }
-}
-
 // Aliases for non-encoded ABI values
 type uint64 = bigint;
 type bytes = string;
@@ -527,30 +509,130 @@ export class ARC56Test {
     };
   };
 
+  private getABITypeFromStructFields(structFields: any): string {
+    const typesArray: any[] = [];
+
+    for (const key in structFields) {
+      if (typeof structFields[key] === "object") {
+        typesArray.push(this.getABITypeFromStructFields(structFields[key]));
+      } else {
+        typesArray.push(structFields[key]);
+      }
+    }
+
+    return JSON.stringify(typesArray)
+      .replace(/"/g, "")
+      .replace(/\]/g, ")")
+      .replace(/\[/g, "(");
+  }
+
+  private getABIType(type: string) {
+    if (this.arc56.structs[type]) {
+      return this.getABITypeFromStructFields(this.arc56.structs[type]);
+    }
+
+    return type;
+  }
+
+  private getABIEncodedValue(
+    value: algosdk.ABIValue,
+    type: string
+  ): Uint8Array {
+    if (type === "bytes") return Buffer.from(value as string);
+    const abiType = this.getABIType(type);
+
+    return algosdk.ABIType.from(abiType).encode(value);
+  }
+
+  private getObjectFromStructFieldsAndArray(
+    structFields: any,
+    valuesArray: any[]
+  ): any {
+    const obj: any = {};
+
+    for (const key in structFields) {
+      if (
+        typeof structFields[key] === "object" &&
+        !Array.isArray(structFields[key])
+      ) {
+        obj[key] = this.getObjectFromStructFieldsAndArray(
+          structFields[key],
+          valuesArray.shift()
+        );
+      } else {
+        obj[key] = valuesArray.shift();
+      }
+    }
+
+    return obj;
+  }
+
+  /** Get the typescript value, which may be the ABIValue or the struct */
+  private getTypeScriptValue(type: string, value: Uint8Array): any {
+    if (type === "bytes") return Buffer.from(value).toString();
+    const abiType = this.getABIType(type);
+
+    const abiValue = algosdk.ABIType.from(abiType).decode(value);
+
+    if (this.arc56.structs[abiType]) {
+      return this.getObjectFromStructFieldsAndArray(
+        this.arc56.structs[abiType],
+        abiValue as algosdk.ABIValue[]
+      );
+    }
+
+    return abiValue;
+  }
+
+  private async getGlobalStateValue(
+    b64Key: string,
+    algod: algosdk.Algodv2,
+    appId: bigint,
+    type: string
+  ): Promise<any> {
+    const result = await algod.getApplicationByID(Number(appId)).do();
+
+    const keyValue = result.params["global-state"].find(
+      (s: any) => s.key === b64Key
+    );
+
+    if (keyValue.value.type === 1) {
+      return this.getTypeScriptValue(
+        type,
+        new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"))
+      );
+    } else {
+      return this.getTypeScriptValue(
+        type,
+        algosdk.encodeUint64(keyValue.value.uint)
+      );
+    }
+  }
+
   state = {
     keys: {
       globalKey: async (): Promise<uint64> => {
-        return getGlobalStateValue(
+        return await this.getGlobalStateValue(
           "Z2xvYmFsS2V5",
           this.algorand.client.algod,
-          this.appId
-        ) as Promise<uint64>;
+          this.appId,
+          "uint64"
+        );
       },
     },
     maps: {
       globalMap: {
-        value: async (key: string): Promise<CustomType0> => {
-          const encodedKey = algosdk.ABIType.from("string").encode(key);
-          const fullKey = Buffer.concat([
+        value: async (key: string): Promise<{ foo: uint16; bar: uint16 }> => {
+          const encodedKey = Buffer.concat([
             Buffer.from("p"),
-            Buffer.from(encodedKey),
+            Buffer.from(this.getABIEncodedValue(key, "string")),
           ]);
-          return rawValueToCustomType0(
-            (await getGlobalStateValue(
-              Buffer.from(fullKey).toString("base64"),
-              this.algorand.client.algod,
-              this.appId
-            )) as Uint8Array
+
+          return await this.getGlobalStateValue(
+            Buffer.from(encodedKey).toString("base64"),
+            this.algorand.client.algod,
+            this.appId,
+            "{ foo: uint16; bar: uint16 }"
           );
         },
       },
