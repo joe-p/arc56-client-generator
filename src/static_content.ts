@@ -375,6 +375,32 @@ private getTypeScriptValue(type: string, value: Uint8Array): any {
   return abiValue;
 }
 
+private async getLocalStateValue(
+  address: string,
+  b64Key: string,
+  type: string
+): Promise<any> {
+  const result = await this.algorand.client.algod
+    .accountApplicationInformation(address, Number(this.appId))
+    .do();
+
+  const keyValue = result["app-local-state"]["key-value"].find(
+    (s: any) => s.key === b64Key
+  );
+
+  if (keyValue.value.type === 1) {
+    return this.getTypeScriptValue(
+      type,
+      new Uint8Array(Buffer.from(keyValue.value.bytes, "base64"))
+    );
+  } else {
+    return this.getTypeScriptValue(
+      type,
+      algosdk.encodeUint64(keyValue.value.uint)
+    );
+  }
+}
+
 private async getGlobalStateValue(
   b64Key: string,
   type: string

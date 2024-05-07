@@ -350,15 +350,28 @@ class ARC56Generator {
     if (Object.keys(this.arc56.state.keys).length > 0) {
       lines.push("keys: {");
 
-      // TODO: Box and Local
-      (["global"] as "global"[]).forEach((storageType) => {
+      // TODO: Box
+      (["global", "local"] as ("global" | "local")[]).forEach((storageType) => {
         this.arc56.state.keys[storageType].forEach((k) => {
-          lines.push(`${k.name}: async (): Promise<${k.valueType}> => {`);
+          if (storageType === "local") {
+            lines.push(
+              `${k.name}: async (address: string): Promise<${k.valueType}> => {`
+            );
 
-          lines.push(`return await this.getGlobalStateValue(
-            "${k.key}",
-            "${k.valueType}"
-          );`);
+            lines.push(`return await this.getLocalStateValue(
+              address,
+              "${k.key}",
+              "${k.valueType}"
+            );`);
+          } else {
+            lines.push(`${k.name}: async (): Promise<${k.valueType}> => {`);
+
+            lines.push(`return await this.getGlobalStateValue(
+              "${k.key}",
+              "${k.valueType}"
+            );`);
+          }
+
           lines.push("},");
         });
       });

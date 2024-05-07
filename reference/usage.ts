@@ -110,6 +110,8 @@ async function main() {
   });
 
   await appClient.optIn().optInToApplication();
+
+  console.log("localKey", await appClient.state.keys.localKey(defaultSender));
 }
 
 await main();
