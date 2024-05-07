@@ -266,64 +266,6 @@ export type TemplateVariables = {
   someNumber: uint64;
 };
 
-// Convert ARC56 structs to arrays primarily for passing as methodArgs
-export function CustomType0ToArray(customtype0: CustomType0): [uint16, uint16] {
-  return [customtype0.foo, customtype0.bar];
-}
-
-export function OutputsToArray(outputs: Outputs): [uint64, uint64] {
-  return [outputs.sum, outputs.difference];
-}
-
-export function InputsToArray(
-  inputs: Inputs
-): [[uint64, uint64], [uint64, uint64]] {
-  return [
-    [inputs.add.a, inputs.add.b],
-    [inputs.subtract.a, inputs.subtract.b],
-  ];
-}
-
-// Binary To Structs
-export function rawValueToCustomType0(rawValue: Uint8Array): CustomType0 {
-  const decoded = algosdk.ABITupleType.from("(uint16,uint16)")
-    .decode(rawValue)
-    .valueOf() as [uint16, uint16];
-
-  return {
-    foo: decoded[0],
-    bar: decoded[1],
-  };
-}
-
-export function rawValueToOutputs(rawValue: Uint8Array): Outputs {
-  const decoded = algosdk.ABITupleType.from("(uint64,uint64)")
-    .decode(rawValue)
-    .valueOf() as [uint64, uint64];
-
-  return {
-    sum: decoded[0],
-    difference: decoded[1],
-  };
-}
-
-export function rawValueToInputs(rawValue: Uint8Array): Inputs {
-  const decoded = algosdk.ABITupleType.from("((uint64,uint64),(uint64,uint64))")
-    .decode(rawValue)
-    .valueOf() as [[uint64, uint64], [uint64, uint64]];
-
-  return {
-    add: {
-      a: decoded[0][0],
-      b: decoded[0][1],
-    },
-    subtract: {
-      a: decoded[1][0],
-      b: decoded[1][1],
-    },
-  };
-}
-
 export class ARC56Test {
   appId: bigint;
   algorand: AlgorandClient;
@@ -381,6 +323,43 @@ export class ARC56Test {
     }
   }
 
+  private getABIValuesFromStructFieldsAndObject(
+    structFields: any,
+    obj: any
+  ): algosdk.ABIValue[] {
+    const valuesArray: any[] = [];
+
+    for (const key in structFields) {
+      if (
+        typeof structFields[key] === "object" &&
+        !Array.isArray(structFields[key])
+      ) {
+        valuesArray.push(
+          this.getABIValuesFromStructFieldsAndObject(
+            structFields[key],
+            obj[key]
+          )
+        );
+      } else {
+        valuesArray.push(obj[key]);
+      }
+    }
+
+    return valuesArray;
+  }
+
+  private getABIValue(type: string, value: any): algosdk.ABIValue {
+    if (type === "bytes") return value;
+    if (this.arc56.structs[type]) {
+      return this.getABIValuesFromStructFieldsAndObject(
+        this.arc56.structs[type],
+        value
+      );
+    }
+
+    return value;
+  }
+
   async compileProgram(
     algorand: AlgorandClient,
     program: "clear" | "approval",
@@ -411,7 +390,7 @@ export class ARC56Test {
           sender,
           appId: this.appId,
           method: this.contract.getMethodByName("foo")!,
-          args: [InputsToArray(inputs)],
+          args: [this.getABIValue("Inputs", inputs)],
           ...methodParams,
         };
       },
@@ -450,7 +429,10 @@ export class ARC56Test {
 
         return {
           result,
-          returnValue: rawValueToOutputs(result.returns![0].rawReturnValue!),
+          returnValue: this.getTypeScriptValue(
+            "Outputs",
+            result.returns![0].rawReturnValue!
+          ),
         };
       },
     };
@@ -574,9 +556,9 @@ export class ARC56Test {
 
     const abiValue = algosdk.ABIType.from(abiType).decode(value);
 
-    if (this.arc56.structs[abiType]) {
+    if (this.arc56.structs[type]) {
       return this.getObjectFromStructFieldsAndArray(
-        this.arc56.structs[abiType],
+        this.arc56.structs[type],
         abiValue as algosdk.ABIValue[]
       );
     }
@@ -640,8 +622,8 @@ export class ARC56Test {
   };
 
   decodeReturnValue = {
-    foo(rawValue: Uint8Array): Outputs {
-      return rawValueToOutputs(rawValue);
+    foo: (rawValue: Uint8Array): Outputs => {
+      return this.getTypeScriptValue("Outputs", rawValue);
     },
   };
 }
