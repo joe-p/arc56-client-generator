@@ -514,14 +514,15 @@ class ARC56Generator {
 
     if (Object.keys(this.arc56.state.maps).length > 0) {
       lines.push("maps: {");
-      lines.push("values: {");
 
       // TODO: Box and Local
       // TODO: Custom key/value types
       (["global"] as "global"[]).forEach((storageType) => {
         this.arc56.state.maps[storageType].forEach((m) => {
+          lines.push(`${m.name}: {`);
+
           lines.push(
-            `${m.name}: async (key: ${this.getTypeScriptType(m.keyType)}): Promise<${this.getTypeScriptType(m.valueType)}> => {`
+            `value: async (key: ${this.getTypeScriptType(m.keyType)}): Promise<${this.getTypeScriptType(m.valueType)}> => {`
           );
 
           lines.push(
@@ -548,10 +549,9 @@ class ARC56Generator {
           }
 
           lines.push("},");
+          lines.push("},");
         });
       });
-
-      lines.push("},");
     }
     lines.push("},");
     lines.push("};");
