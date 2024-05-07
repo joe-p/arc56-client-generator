@@ -321,19 +321,9 @@ class ARC56Generator {
       );
 
       const logic = `
-      const sender = methodParams?.sender ?? this.defaultSender;
-
-      if (sender === undefined) {
-        throw new Error("No sender provided");
-      }
-
       const group = this.algorand.newGroup();
       group.addMethodCall({
-        sender,
-        appId: this.appId,
-        method: this.contract.getMethodByName("${m.name}")!,
-        args: [InputsToArray(inputs)],
-        ...methodParams,
+        ...this.params(methodParams).${m.name}(${m.args.map((a) => a.name).join(",")}),
       });
 
       const result = await this.executeWithErrorParsing(group);
@@ -373,15 +363,10 @@ class ARC56Generator {
       );
 
       const logic = `
-      if (this.appId !== 0n)
+      if (this.appId !== 0n) {
         throw Error(
           \`Create was called but the app has already been created: \${this.appId.toString()}\`
         );
-
-      const sender = methodParams?.sender ?? this.defaultSender;
-
-      if (sender === undefined) {
-        throw new Error("No sender provided");
       }
 
       // TODO: fix bug in AlgorandClient with schema
@@ -403,10 +388,7 @@ class ARC56Generator {
           "clear",
           ${this.arc56.templateVariables === undefined ? "" : "methodParams.templateVariables"}
         ),
-        sender,
-        appId: this.appId,
-        method: this.contract.getMethodByName("${m.name}")!,
-        ...methodParams,
+        ...this.params(methodParams).${m.name}(${m.args.map((a) => a.name).join(",")}),
       });
 
       const result = await this.executeWithErrorParsing(group);
@@ -507,11 +489,11 @@ class ARC56Generator {
 
   ${this.getCompileProgramLines().join("\n")}
 
+  ${this.getParamsLines().join("\n")}
+
   ${this.getCallLines().join("\n")}
 
   ${this.getCreateLines().join("\n")}
-
-  ${this.getParamsLines().join("\n")}
   }
   `.trim();
 
