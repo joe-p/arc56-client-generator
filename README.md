@@ -1,17 +1,10 @@
 # ARC56 Client Generator
 
-## Reference Client
+Generates an application client for interacting with an ARC56 contract
 
-[The reference client](./reference/reference_client.ts) is a handwritten client that demonstrates what a generated client would look like. Once the reference client has all of the features implemented, the next step will be to automate the generation of this client from ARC56 JSON.
+## Example
 
-- [x] Call methods
-- [x] Get method params for composer
-- [x] Decode method inputs/outputs
-- [x] Create apps
-- [x] Error parsing
-- [x] Get state values
-- [x] Support template variables on create
-- [ ] Other OnCompletes (will do after templating since its a lot of duplicated code)
+[example/](example/) contains an exmaple ARC56 contract JSON along with the generated client and a demo script using the generated cleint
 
 ## Future Features
 

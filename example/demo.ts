@@ -1,4 +1,4 @@
-import ARC56TestClient, { type Inputs } from "./reference_client_2";
+import ARC56TestClient, { type Inputs } from "./ARC56TestClient";
 import {
   AlgorandClient,
   microAlgos,

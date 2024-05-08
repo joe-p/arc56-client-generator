@@ -1,5 +1,5 @@
 import { type ARC56Contract, type StructFields } from "./types/arc56";
-import arc56Ref from "../reference/ref.arc56.json";
+import arc56Ref from "../example/ARC56Test.arc56.json";
 import algosdk from "algosdk";
 import { format } from "prettier";
 import * as staticContent from "./static_content";
