@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^6.0.2",
+    "@algorandfoundation/tealscript": "^0.92.0",
     "algosdk": "^2.7.0",
     "prettier": "^3.2.5"
   }
