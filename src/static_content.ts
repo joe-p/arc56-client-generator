@@ -26,7 +26,7 @@ type ABIType = string;
 type StructName = string;
 
 /** Raw byteslice without the length prefixed that is specified in ARC-4 */
-type AVMBytes = "bytes";
+type AVMBytes = 'bytes';
 
 /** Mapping of named structs to the ABI type of their fields */
 interface StructFields {
@@ -35,8 +35,6 @@ interface StructFields {
 
 /** Describes a single key in app storage */
 interface StorageKey {
-  /** Human readable name */
-  name: string;
   /** Description of what this storage key holds */
   desc?: string;
   /** The type of the key */
@@ -48,8 +46,6 @@ interface StorageKey {
 }
 
 interface StorageMap {
-  /** Human readable name */
-  name: string;
   /** Description of what the key-value pairs in this mapping hold */
   desc?: string;
   /** The type of the keys in the map */
@@ -118,19 +114,12 @@ interface Method {
   /** an action is a combination of call/create and an OnComplete */
   actions: {
     /** OnCompletes this method allows when appID === 0 */
-    create: ("NoOp" | "OptIn" | "DeleteApplication")[];
+    create: ('NoOp' | 'OptIn' | 'DeleteApplication')[];
     /** OnCompletes this method allows when appID !== 0 */
-    call: (
-      | "NoOp"
-      | "OptIn"
-      | "CloseOut"
-      | "ClearState"
-      | "UpdateApplication"
-      | "DeleteApplication"
-    )[];
+    call: ('NoOp' | 'OptIn' | 'CloseOut' | 'ClearState' | 'UpdateApplication' | 'DeleteApplication')[];
   };
   /** If this method does not write anything to the ledger (ARC-22) */
-  readonly?: boolean;
+  readonly: boolean;
   /** ARC-28 events that MAY be emitted by this method */
   events?: Array<Event>;
   /** Information that clients can use when calling the method */
@@ -196,32 +185,25 @@ export interface ARC56Contract {
         bytes: number;
       };
     };
-    /** Describes single key-value pairs in the application's state */
+    /** Mapping of human-readable names to StorageKey objects */
     keys: {
-      global: StorageKey[];
-      local: StorageKey[];
-      box: StorageKey[];
+      global: { [name: string]: StorageKey };
+      local: { [name: string]: StorageKey };
+      box: { [name: string]: StorageKey };
     };
-    /** Describes key-value maps in the application's state */
+    /** Mapping of human-readable names to StorageMap objects */
     maps: {
-      global: StorageMap[];
-      local: StorageMap[];
-      box: StorageMap[];
+      global: { [name: string]: StorageMap };
+      local: { [name: string]: StorageMap };
+      box: { [name: string]: StorageMap };
     };
   };
   /** Supported bare actions for the contract. An action is a combination of call/create and an OnComplete */
   bareActions: {
     /** OnCompletes this method allows when appID === 0 */
-    create: ("NoOp" | "OptIn" | "DeleteApplication")[];
+    create: ('NoOp' | 'OptIn' | 'DeleteApplication')[];
     /** OnCompletes this method allows when appID !== 0 */
-    call: (
-      | "NoOp"
-      | "OptIn"
-      | "CloseOut"
-      | "ClearState"
-      | "UpdateApplication"
-      | "DeleteApplication"
-    )[];
+    call: ('NoOp' | 'OptIn' | 'CloseOut' | 'ClearState' | 'UpdateApplication' | 'DeleteApplication')[];
   };
   /** Information about the TEAL */
   sourceInfo?: SourceInfo[];
@@ -234,13 +216,10 @@ export interface ARC56Contract {
   };
   /** ARC-28 events that MAY be emitted by this contract */
   events?: Array<Event>;
-  /** Template Variables */
+  /** A mapping of template variable names as they appear in the teal (not including TMPL_ prefix) and their respecive types */
   templateVariables?: {
-    /** The name of the template variable as it appears in the TEAL */
-    name: string;
-    /** The type of the value expected in the template variable */
-    type: ABIType | AVMBytes | StructName;
-  }[];
+    [name: string]: ABIType | AVMBytes | StructName;
+  };
 }
 `.trim();
 

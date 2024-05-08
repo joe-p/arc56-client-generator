@@ -44,8 +44,8 @@ class ARC56Generator {
       }
     };
 
-    this.arc56.templateVariables?.forEach((t) => {
-      pushType(t.type);
+    Object.values(this.arc56.templateVariables ?? {}).forEach((type) => {
+      pushType(type);
     });
 
     this.arc56.methods.forEach((m) => {
@@ -58,12 +58,12 @@ class ARC56Generator {
 
     (["global", "local", "box"] as ["global", "local", "box"]).forEach(
       (storageType) => {
-        this.arc56.state.keys[storageType].forEach((k) => {
+        Object.values(this.arc56.state.keys[storageType]).forEach((k) => {
           pushType(k.keyType);
           pushType(k.valueType);
         });
 
-        this.arc56.state.maps[storageType].forEach((m) => {
+        Object.values(this.arc56.state.maps[storageType]).forEach((m) => {
           pushType(m.keyType);
           pushType(m.valueType);
         });
@@ -115,10 +115,7 @@ class ARC56Generator {
   }
 
   getTemplateVariableTypeLines() {
-    if (
-      this.arc56.templateVariables === undefined ||
-      this.arc56.templateVariables.length === 0
-    ) {
+    if (Object.keys(this.arc56.templateVariables ?? {}).length === 0) {
       return [];
     }
 
@@ -127,8 +124,8 @@ class ARC56Generator {
       "export type TemplateVariables = {",
     ];
 
-    this.arc56.templateVariables.forEach((tv) => {
-      lines.push(`  ${tv.name}: ${tv.type},`);
+    Object.keys(this.arc56.templateVariables ?? {}).forEach((name) => {
+      lines.push(`  ${name}: ${this.arc56.templateVariables![name]},`);
     });
 
     lines.push("}");
@@ -139,7 +136,7 @@ class ARC56Generator {
   getCompileProgramLines() {
     if (this.arc56.source === undefined) return [];
 
-    if (this.arc56.templateVariables?.length === 0) {
+    if (Object.keys(this.arc56.templateVariables ?? {}).length === 0) {
       return staticContent.noTemplateVarsCompileProgram.split("\n");
     }
 
@@ -148,9 +145,9 @@ class ARC56Generator {
       `let tealString = Buffer.from(this.arc56.source![program], "base64").toString();`,
     ];
 
-    this.arc56.templateVariables?.forEach((tv) => {
+    Object.keys(this.arc56.templateVariables ?? {}).forEach((name) => {
       lines.push(
-        `tealString = tealString.replace(/pushint TMPL_${tv.name}/g, \`pushint \${templateVars["${tv.name}"].toString()}\`)`
+        `tealString = tealString.replace(/pushint TMPL_${name}/g, \`pushint \${templateVars["${name}"].toString()}\`)`
       );
     });
 
@@ -190,7 +187,7 @@ class ARC56Generator {
       this.arc56.methods.forEach((m) => {
         if (!m.actions.call.includes(oc)) return;
         lines.push(
-          `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct || m.returns.type}}> => {`
+          `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}}> => {`
         );
 
         const logic = `
@@ -242,7 +239,7 @@ class ARC56Generator {
     this.arc56.methods.forEach((m) => {
       if (m.actions.create.length === 0) return;
       lines.push(
-        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
+        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
       );
 
       const logic = `
@@ -309,7 +306,7 @@ class ARC56Generator {
 
     this.arc56.methods.forEach((m) => {
       lines.push(
-        `${m.name}: (${m.args.map((a) => `${a.name}: ${a.struct || a.type}`)}): MethodCallParams => {`
+        `${m.name}: (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): MethodCallParams => {`
       );
 
       const args = m.args
@@ -352,10 +349,11 @@ class ARC56Generator {
 
       (["global", "local", "box"] as ("global" | "local" | "box")[]).forEach(
         (storageType) => {
-          this.arc56.state.keys[storageType].forEach((k) => {
+          Object.keys(this.arc56.state.keys[storageType]).forEach((name) => {
+            const k = this.arc56.state.keys[storageType][name];
             if (storageType === "local") {
               lines.push(
-                `${k.name}: async (address: string): Promise<${k.valueType}> => {`
+                `${name}: async (address: string): Promise<${k.valueType}> => {`
               );
 
               lines.push(`return await this.getLocalStateValue(
@@ -364,7 +362,7 @@ class ARC56Generator {
               "${k.valueType}"
             );`);
             } else {
-              lines.push(`${k.name}: async (): Promise<${k.valueType}> => {`);
+              lines.push(`${name}: async (): Promise<${k.valueType}> => {`);
 
               lines.push(`return await this.${storageType === "box" ? "getBoxValue" : "getGlobalStateValue"}(
               "${k.key}",
@@ -385,8 +383,9 @@ class ARC56Generator {
 
       (["global", "local", "box"] as ("global" | "local" | "box")[]).forEach(
         (storageType) => {
-          this.arc56.state.maps[storageType].forEach((m) => {
-            lines.push(`${m.name}: {`);
+          Object.keys(this.arc56.state.maps[storageType]).forEach((name) => {
+            const m = this.arc56.state.maps[storageType][name];
+            lines.push(`${name}: {`);
 
             if (storageType === "local") {
               lines.push(
