@@ -116,7 +116,7 @@ Because ARC56 contais the full source information, complete stack traces in the 
 
 ## Generated Client
 
-The generated client is a very thin wrapper on top of the generic client. The typed clients offers a slightly more intuitive typesace interface for all of the actions supported by the underlying `ARC56AppClient`. Because the typed client does not offer any functionality not found in the generic client, [the generator](./src/index.ts) is trivial to maintain.
+The generated client is a very thin wrapper on top of the generic client. The typed clients offers a slightly more intuitive typesafe interface for all of the actions supported by the underlying `ARC56AppClient`. Because the typed client does not offer any functionality not found in the generic client, [the generator](./src/index.ts) is trivial to maintain.
 
 ### Untyped Client
 
