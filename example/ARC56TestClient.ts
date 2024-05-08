@@ -372,4 +372,3 @@ export class ARC56TestClient extends ARC56AppClient {
 }
 
 export default ARC56TestClient;
-

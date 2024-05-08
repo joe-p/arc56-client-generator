@@ -1,10 +1,9 @@
 import { type ARC56Contract, type StructFields } from "./types/arc56";
-import arc56Ref from "../example/ARC56Test.arc56.json";
 import algosdk from "algosdk";
 import { format } from "prettier";
 import * as staticContent from "./static_content";
 
-class ARC56Generator {
+export default class ARC56Generator {
   arc56: ARC56Contract;
 
   customTypes: string[] = [];
@@ -349,12 +348,9 @@ class ARC56Generator {
 
     // console.log(content);
     try {
-      console.log(await format(content, { parser: "typescript" }));
+      return await format(content, { parser: "typescript" });
     } catch (e) {
-      console.log(content);
-      throw e;
+      throw Error(`Error formatting generated code: ${e}`);
     }
   }
 }
-
-new ARC56Generator(arc56Ref as ARC56Contract).generate();
