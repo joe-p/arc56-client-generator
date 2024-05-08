@@ -120,7 +120,7 @@ async function main() {
 
   console.log(
     "globalMap -> foo",
-    await await appClient.getState.map("globalMap", "foo")
+    await await appClient.getState.map.value("globalMap", "foo")
   );
 
   await algorand.send.payment({
@@ -138,13 +138,13 @@ async function main() {
 
   console.log(
     "localMap",
-    await appClient.getState.map("localMap", "foo", defaultSender)
+    await appClient.getState.map.value("localMap", "foo", defaultSender)
   );
 
   console.log("boxKey", await appClient.getState.key("boxKey"));
   console.log(
     "boxMap",
-    await appClient.getState.map("boxMap", {
+    await appClient.getState.map.value("boxMap", {
       add: { a: 1n, b: 2n },
       subtract: { a: 4n, b: 3n },
     })

@@ -348,17 +348,17 @@ export class ARC56TestClient extends ARC56AppClient {
     maps: {
       globalMap: {
         value: async (key: string): Promise<{ foo: uint16; bar: uint16 }> => {
-          return this.getState.map("globalMap", key);
+          return this.getState.map.value("globalMap", key);
         },
       },
       localMap: {
         value: async (address: string, key: bytes): Promise<string> => {
-          return this.getState.map("localMap", key, address);
+          return this.getState.map.value("localMap", key, address);
         },
       },
       boxMap: {
         value: async (key: Inputs): Promise<Outputs> => {
-          return this.getState.map("boxMap", key);
+          return this.getState.map.value("boxMap", key);
         },
       },
     },

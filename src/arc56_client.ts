@@ -452,56 +452,64 @@ export class ARC56AppClient {
       throw new Error(`Key ${key} not found in ${this.arc56.name} state`);
     },
 
-    map: async (mapName: string, key: any, address?: string): Promise<any> => {
-      let mapObject: StorageMap | undefined;
+    map: {
+      value: async (
+        mapName: string,
+        key: any,
+        address?: string
+      ): Promise<any> => {
+        let mapObject: StorageMap | undefined;
 
-      if (this.arc56.state.maps.global[mapName]) {
-        mapObject = this.arc56.state.maps.global[mapName];
-      }
+        if (this.arc56.state.maps.global[mapName]) {
+          mapObject = this.arc56.state.maps.global[mapName];
+        }
 
-      if (this.arc56.state.maps.local[mapName]) {
-        mapObject = this.arc56.state.maps.local[mapName];
-      }
+        if (this.arc56.state.maps.local[mapName]) {
+          mapObject = this.arc56.state.maps.local[mapName];
+        }
 
-      if (this.arc56.state.maps.box[mapName]) {
-        mapObject = this.arc56.state.maps.box[mapName];
-      }
+        if (this.arc56.state.maps.box[mapName]) {
+          mapObject = this.arc56.state.maps.box[mapName];
+        }
 
-      if (!mapObject) {
-        throw new Error(`Map ${mapName} not found in ${this.arc56.name} state`);
-      }
-
-      const encodedKey = Buffer.concat([
-        Buffer.from(mapObject.prefix ?? ""),
-        this.getABIEncodedValue(key, mapObject.keyType),
-      ]);
-
-      if (this.arc56.state.maps.global[mapName]) {
-        return await this.getGlobalStateValue(
-          Buffer.from(encodedKey).toString("base64"),
-          mapObject.valueType
-        );
-      }
-
-      if (this.arc56.state.maps.local[mapName]) {
-        if (address === undefined) {
+        if (!mapObject) {
           throw new Error(
-            `Address must be provided for local map ${mapName} in ${this.arc56.name} state`
+            `Map ${mapName} not found in ${this.arc56.name} state`
           );
         }
-        return await this.getLocalStateValue(
-          address,
-          Buffer.from(encodedKey).toString("base64"),
-          mapObject.valueType
-        );
-      }
 
-      if (this.arc56.state.maps.box[mapName]) {
-        return await this.getBoxValue(
-          Buffer.from(encodedKey).toString("base64"),
-          mapObject.valueType
-        );
-      }
+        const encodedKey = Buffer.concat([
+          Buffer.from(mapObject.prefix ?? ""),
+          this.getABIEncodedValue(key, mapObject.keyType),
+        ]);
+
+        if (this.arc56.state.maps.global[mapName]) {
+          return await this.getGlobalStateValue(
+            Buffer.from(encodedKey).toString("base64"),
+            mapObject.valueType
+          );
+        }
+
+        if (this.arc56.state.maps.local[mapName]) {
+          if (address === undefined) {
+            throw new Error(
+              `Address must be provided for local map ${mapName} in ${this.arc56.name} state`
+            );
+          }
+          return await this.getLocalStateValue(
+            address,
+            Buffer.from(encodedKey).toString("base64"),
+            mapObject.valueType
+          );
+        }
+
+        if (this.arc56.state.maps.box[mapName]) {
+          return await this.getBoxValue(
+            Buffer.from(encodedKey).toString("base64"),
+            mapObject.valueType
+          );
+        }
+      },
     },
   };
 

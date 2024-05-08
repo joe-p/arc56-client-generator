@@ -269,14 +269,13 @@ export default class ARC56Generator {
             const m = this.arc56.state.maps[storageType][name];
             lines.push(`${name}: {`);
 
-            // return this.getState.map("localMap", key, address);
             if (storageType === "local") {
               lines.push(
-                `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map("${name}", key, address) },`
+                `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map.value("${name}", key, address) },`
               );
             } else {
               lines.push(
-                `value: async (key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map("${name}", key) },`
+                `value: async (key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map.value("${name}", key) },`
               );
             }
 
