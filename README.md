@@ -33,7 +33,7 @@ This also works for state keys and values
 console.log("boxKey", await appClient.getState.key("boxKey"));
 console.log(
   "boxMap",
-  await appClient.getState.map("boxMap", {
+  await appClient.getState.map.value("boxMap", {
     add: { a: 1n, b: 2n },
     subtract: { a: 4n, b: 3n },
   })
