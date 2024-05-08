@@ -133,33 +133,6 @@ class ARC56Generator {
     return lines;
   }
 
-  getCompileProgramLines() {
-    if (this.arc56.source === undefined) return [];
-
-    if (Object.keys(this.arc56.templateVariables ?? {}).length === 0) {
-      return staticContent.noTemplateVarsCompileProgram.split("\n");
-    }
-
-    const lines = [
-      `async compileProgram(algorand: AlgorandClient, program: "clear" | "approval", templateVars: TemplateVariables) {`,
-      `let tealString = Buffer.from(this.arc56.source![program], "base64").toString();`,
-    ];
-
-    Object.keys(this.arc56.templateVariables ?? {}).forEach((name) => {
-      lines.push(
-        `tealString = tealString.replace(/pushint TMPL_${name}/g, \`pushint \${templateVars["${name}"].toString()}\`)`
-      );
-    });
-
-    lines.push(
-      `const result = await algorand.client.algod.compile(tealString).do();`,
-      `return new Uint8Array(Buffer.from(result.result, "base64"));`,
-      `}`
-    );
-
-    return lines;
-  }
-
   getCallLines() {
     const lines: string[] = [];
 
@@ -190,26 +163,13 @@ class ARC56Generator {
           `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}}> => {`
         );
 
-        const logic = `
-      const group = this.algorand.newGroup();
-      group.addMethodCall({
-        ...this.params(methodParams).${m.name}(${m.args.map((a) => a.name).join(",")}),
-        onComplete: algosdk.OnApplicationComplete.${oc}OC,
-      });
+        // return this.methodCall("foo", { ...methodParams, args: [inputs] });
 
-      const result = await this.executeWithErrorParsing(group);
-
-      return {
-        result,`;
-
-        lines.push(...logic.split("\n"));
-        if (m.returns.type !== "void") {
-          lines.push(
-            `returnValue: this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", result.returns![0].rawReturnValue!) };`
-          );
-        } else {
-          lines.push("returnValue: undefined, };");
-        }
+        let methodName = `${ocMap[oc]}MethodCall`;
+        if (oc === "NoOp") methodName = "methodCall";
+        lines.push(
+          `return this.${methodName}("${m.name}", { ...methodParams, args: [${m.args.map((a) => a.name).join(",")}] });`
+        );
         lines.push("},");
       });
 
@@ -242,56 +202,9 @@ class ARC56Generator {
         `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
       );
 
-      const logic = `
-      if (this.appId !== 0n) {
-        throw Error(
-          \`Create was called but the app has already been created: \${this.appId.toString()}\`
-        );
-      }
-
-      const group = this.algorand.newGroup();
-      group.addMethodCall({
-        schema: {
-          globalByteSlices: this.arc56.state.schema.global.bytes,
-          globalUints: this.arc56.state.schema.global.ints,
-          localByteSlices: this.arc56.state.schema.local.bytes,
-          localUints: this.arc56.state.schema.local.ints,
-        },
-        approvalProgram: await this.compileProgram(
-          this.algorand,
-          "approval",
-          ${this.arc56.templateVariables === undefined ? "" : "methodParams.templateVariables"}
-        ),
-        clearProgram: await this.compileProgram(
-          this.algorand,
-          "clear",
-          ${this.arc56.templateVariables === undefined ? "" : "methodParams.templateVariables"}
-        ),
-        ...this.params(methodParams).${m.name}(${m.args.map((a) => a.name).join(",")}),
-      });
-
-      const result = await this.executeWithErrorParsing(group);
-
-      this.appId = BigInt(result.confirmations.at(-1)!.applicationIndex!);
-      this.appAddress = algosdk.getApplicationAddress(this.appId);
-
-      return {
-        appId: this.appId,
-        appAddress: this.appAddress,
-        result,
-        `.trim();
-
-      lines.push(...logic.split("\n"));
-
-      if (m.returns.type !== "void") {
-        lines.push(
-          `returnValue: this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", result.returns![0].rawReturnValue!)`
-        );
-      } else {
-        lines.push("returnValue: undefined,");
-      }
-
-      lines.push("};");
+      lines.push(
+        `return this.createMethodCall("${m.name}", { ...methodParams, args: [${m.args.map((a) => a.name).join(",")}] });`
+      );
 
       lines.push("},");
     });
@@ -309,28 +222,9 @@ class ARC56Generator {
         `${m.name}: (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): MethodCallParams => {`
       );
 
-      const args = m.args
-        .map((a) => {
-          return `this.getABIValue("${a.struct ?? a.type}", ${a.name})`;
-        })
-        .join(", ");
-
-      const logic = `
-      const sender = methodParams?.sender ?? this.defaultSender;
-
-      if (sender === undefined) {
-        throw new Error("No sender provided");
-      }
-
-      return {
-        sender,
-        appId: this.appId,
-        method: this.contract.getMethodByName("${m.name}")!,
-        args: [${args}],
-        ...methodParams,
-      };`;
-
-      lines.push(...logic.split("\n"));
+      lines.push(
+        `return this.getParams("${m.name}", { ...methodParams, args: [${m.args.map((a) => a.name).join(",")}] });`
+      );
       lines.push("},");
     });
 
@@ -353,24 +247,13 @@ class ARC56Generator {
             const k = this.arc56.state.keys[storageType][name];
             if (storageType === "local") {
               lines.push(
-                `${name}: async (address: string): Promise<${k.valueType}> => {`
+                `${name}: async (address: string): Promise<${k.valueType}> => { return this.getState.key("${name}", address) },`
               );
-
-              lines.push(`return await this.getLocalStateValue(
-              address,
-              "${k.key}",
-              "${k.valueType}"
-            );`);
             } else {
-              lines.push(`${name}: async (): Promise<${k.valueType}> => {`);
-
-              lines.push(`return await this.${storageType === "box" ? "getBoxValue" : "getGlobalStateValue"}(
-              "${k.key}",
-              "${k.valueType}"
-            );`);
+              lines.push(
+                `${name}: async (): Promise<${k.valueType}> => { return this.getState.key("${name}") },`
+              );
             }
-
-            lines.push("},");
           });
         }
       );
@@ -387,40 +270,17 @@ class ARC56Generator {
             const m = this.arc56.state.maps[storageType][name];
             lines.push(`${name}: {`);
 
+            // return this.getState.map("localMap", key, address);
             if (storageType === "local") {
               lines.push(
-                `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => {`
+                `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map("${name}", key, address) },`
               );
             } else {
               lines.push(
-                `value: async (key: ${m.keyType}): Promise<${m.valueType}> => {`
+                `value: async (key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map("${name}", key) },`
               );
             }
 
-            if (m.prefix) {
-              lines.push(
-                `const encodedKey = Buffer.concat([Buffer.from("${m.prefix}"), this.getABIEncodedValue(key, "${m.keyType}")]);`
-              );
-            } else {
-              lines.push(
-                `const encodedKey = this.getABIEncodedValue(key, "${m.keyType}");`
-              );
-            }
-
-            if (storageType === "local") {
-              lines.push(`return await this.getLocalStateValue(
-              address,
-              Buffer.from(encodedKey).toString("base64"),
-              "${m.valueType}"
-            );`);
-            } else {
-              lines.push(`return await this.${storageType === "box" ? "getBoxValue" : "getGlobalStateValue"}(
-              Buffer.from(encodedKey).toString("base64"),
-              "${m.valueType}"
-            );`);
-            }
-
-            lines.push("},");
             lines.push("},");
           });
         }
@@ -444,9 +304,7 @@ class ARC56Generator {
         `${m.name}: (rawValue: Uint8Array): ${m.returns.struct ?? m.returns.type} => {`
       );
 
-      lines.push(
-        `return this.getTypeScriptValue("${m.returns.struct ?? m.returns.type}", rawValue);`
-      );
+      lines.push(`return this.decodeMethodReturnValue("${m.name}", rawValue);`);
 
       lines.push("},");
     });
@@ -465,16 +323,14 @@ class ARC56Generator {
   ${staticContent.arc56TypeDefinitions}
   
   ${this.getABITypeLines().join("\n")}
-  
+
   ${this.getStructTypeLines().join("\n")}
   
   ${this.getTemplateVariableTypeLines().join("\n")}
 
-  export class ${this.arc56.name}Client {
+  export class ${this.arc56.name}Client extends ARC56AppClient {
 
-  ${staticContent.classContent}
-
-  ${this.getCompileProgramLines().join("\n")}
+  ${staticContent.consructor}
 
   ${this.getParamsLines().join("\n")}
 
@@ -486,6 +342,7 @@ class ARC56Generator {
 
   ${this.getDecodeReturnValueLines().join("\n")}
   }
+
   export default ${this.arc56.name}Client;
 
   `.trim();
