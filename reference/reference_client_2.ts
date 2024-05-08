@@ -263,7 +263,7 @@ export type TemplateVariables = {
   someNumber: uint64;
 };
 
-export class ARC56Test {
+export class ARC56TestClient {
   appId: bigint;
   algorand: AlgorandClient;
   contract: algosdk.ABIContract;
@@ -720,4 +720,5 @@ export class ARC56Test {
     },
   };
 }
+export default ARC56TestClient;
 

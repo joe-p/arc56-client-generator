@@ -471,7 +471,7 @@ class ARC56Generator {
   
   ${this.getTemplateVariableTypeLines().join("\n")}
 
-  export class ${this.arc56.name} {
+  export class ${this.arc56.name}Client {
 
   ${staticContent.classContent}
 
@@ -487,6 +487,8 @@ class ARC56Generator {
 
   ${this.getDecodeReturnValueLines().join("\n")}
   }
+  export default ${this.arc56.name}Client;
+
   `.trim();
 
     // console.log(content);

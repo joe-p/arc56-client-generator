@@ -1,4 +1,4 @@
-import { ARC56Test, type Inputs } from "./reference_client_2";
+import ARC56TestClient, { type Inputs } from "./reference_client_2";
 import {
   AlgorandClient,
   microAlgos,
@@ -11,7 +11,7 @@ async function main() {
   const algorand = AlgorandClient.defaultLocalNet();
   const defaultSender = (await algorand.account.localNetDispenser()).addr;
 
-  const appClient = new ARC56Test({
+  const appClient = new ARC56TestClient({
     algorand,
     appId: 0n,
     defaultSender,
@@ -52,7 +52,7 @@ async function main() {
     })
     .foo(inputs);
 
-  const anotherAppClient = new ARC56Test({
+  const anotherAppClient = new ARC56TestClient({
     algorand,
     appId: 0n,
     defaultSender: bob,
