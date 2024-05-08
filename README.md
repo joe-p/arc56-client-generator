@@ -143,6 +143,8 @@ console.log("sum:", sum, "difference:", difference);
 These are features that need to be implemented prior to release
 
 - [ ] JSDoc comments from ARC56
+- [ ] Testing
+- [ ] Debug error parsing not working with resource population
 
 ## Future Features
 
