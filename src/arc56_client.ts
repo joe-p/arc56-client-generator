@@ -274,7 +274,7 @@ export class ARC56AppClient {
     return new Uint8Array(Buffer.from(result.result, "base64"));
   }
 
-  params(methodName: string, methodParams?: MethodParams) {
+  getParams(methodName: string, methodParams?: MethodParams) {
     const sender = methodParams?.sender ?? this.defaultSender;
 
     if (sender === undefined) {
@@ -317,7 +317,7 @@ export class ARC56AppClient {
     const group = this.algorand.newGroup();
 
     group.addMethodCall({
-      ...this.params(methodName, methodParams),
+      ...this.getParams(methodName, methodParams),
       onComplete,
     });
 
@@ -343,7 +343,7 @@ export class ARC56AppClient {
     let returnValue: any = undefined;
 
     if (method.returns.struct ?? method.returns.type !== "void") {
-      returnValue = this.decodeReturnValue(
+      returnValue = this.decodeMethodReturnValue(
         methodName,
         result.returns!.at(-1)?.rawReturnValue!
       );
@@ -354,7 +354,7 @@ export class ARC56AppClient {
     };
   }
 
-  async call(methodName: string, methodParams: MethodParams = {}) {
+  async methodCall(methodName: string, methodParams: MethodParams = {}) {
     return await this.callWithOC(
       methodName,
       algosdk.OnApplicationComplete.NoOpOC,
@@ -362,7 +362,7 @@ export class ARC56AppClient {
     );
   }
 
-  async optIn(methodName: string, methodParams: MethodParams = {}) {
+  async optInMethodCall(methodName: string, methodParams: MethodParams = {}) {
     return await this.callWithOC(
       methodName,
       algosdk.OnApplicationComplete.OptInOC,
@@ -370,7 +370,7 @@ export class ARC56AppClient {
     );
   }
 
-  async create(
+  async createMethodCall(
     methodName: string,
     methodParams: MethodParams & {
       templateVariables?: Record<string, string | bigint>;
@@ -400,7 +400,7 @@ export class ARC56AppClient {
         "clear",
         methodParams.templateVariables
       ),
-      ...this.params(methodName, methodParams),
+      ...this.getParams(methodName, methodParams),
     };
 
     const result = await this.callWithOC(
@@ -415,11 +415,12 @@ export class ARC56AppClient {
     return {
       appId: this.appId,
       appAddress: this.appAddress,
-      result,
+      result: result.result,
+      returnValue: result.returnValue,
     };
   }
 
-  state = {
+  getState = {
     key: async (key: string, address?: string): Promise<any> => {
       if (this.arc56.state.keys.global[key]) {
         return await this.getGlobalStateValue(
@@ -504,7 +505,7 @@ export class ARC56AppClient {
     },
   };
 
-  decodeReturnValue(methodName: string, rawValue: Uint8Array): any {
+  decodeMethodReturnValue(methodName: string, rawValue: Uint8Array): any {
     const method = this.arc56.methods.find((m) => m.name === methodName);
     if (!method) {
       throw new Error(`Method ${methodName} not found in ${this.arc56.name}`);
