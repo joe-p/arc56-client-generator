@@ -37,7 +37,7 @@ interface StorageMap {
 
 interface SourceInfo {
   /** The line of pre-compiled TEAL */
-  teal: number;
+  teal?: number;
   /** The program counter offset(s) that correspond to this line of TEAL */
   pc?: Array<number>;
   /** A human-readable string that describes the error when the program fails at this given line of TEAL */
@@ -105,7 +105,7 @@ interface Method {
     )[];
   };
   /** If this method does not write anything to the ledger (ARC-22) */
-  readonly?: boolean;
+  readonly: boolean;
   /** ARC-28 events that MAY be emitted by this method */
   events?: Array<Event>;
   /** Information that clients can use when calling the method */
@@ -200,8 +200,24 @@ export interface ARC56Contract {
   };
   /** Information about the TEAL */
   sourceInfo?: SourceInfo[];
-  /** The pre-compiled TEAL that may contain template variables. MUST be omitted if included as part of ARC23, but otherwise MUST be defined. */
+  /** The pre-compiled TEAL that may contain template variables. MUST be omitted if included as part of ARC23 */
   source?: {
+    /** The approval program */
+    approval: string;
+    /** The clear program */
+    clear: string;
+  };
+  /** The compiled bytecode for the application. MUST be omitted if included as part of ARC23 */
+  byteCode?: {
+    /** The compiler used to generate the bytecode */
+    compiler: "algod" | "puya";
+    /** Compiler version information */
+    compilerVersion: {
+      major: number;
+      minor: number;
+      patch: number;
+      commit?: string;
+    };
     /** The approval program */
     approval: string;
     /** The clear program */
@@ -209,8 +225,20 @@ export interface ARC56Contract {
   };
   /** ARC-28 events that MAY be emitted by this contract */
   events?: Array<Event>;
-  /** A mapping of template variable names as they appear in the teal (not including TMPL_ prefix) and their respecive types */
+  /** A mapping of template variable names as they appear in the teal (not including TMPL_ prefix) to their respecive types and values (if applicable) */
   templateVariables?: {
-    [name: string]: ABIType | AVMBytes | StructName;
+    [name: string]: {
+      /** The type of the template variable */
+      type: ABIType | AVMBytes | StructName;
+      /** If given, the the base64 encoded value used for the given app/program */
+      value?: string;
+    };
+  };
+  /** The scratch variables used during runtime */
+  scratchVariables?: {
+    [name: string]: {
+      slot: number;
+      type: ABIType | AVMBytes | StructName;
+    };
   };
 }

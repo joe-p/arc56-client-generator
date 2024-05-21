@@ -260,7 +260,7 @@ export class ARC56AppClient {
 
     Object.keys(templateVars || {}).forEach((name) => {
       const value = templateVars![name];
-      const type = this.arc56.templateVariables![name];
+      const { type } = this.arc56.templateVariables![name];
 
       const op = type === "uint64" ? "int" : "byte";
 

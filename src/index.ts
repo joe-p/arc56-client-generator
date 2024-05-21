@@ -43,8 +43,8 @@ export default class ARC56Generator {
       }
     };
 
-    Object.values(this.arc56.templateVariables ?? {}).forEach((type) => {
-      pushType(type);
+    Object.values(this.arc56.templateVariables ?? {}).forEach((t) => {
+      pushType(t.type);
     });
 
     this.arc56.methods.forEach((m) => {
@@ -124,7 +124,7 @@ export default class ARC56Generator {
     ];
 
     Object.keys(this.arc56.templateVariables ?? {}).forEach((name) => {
-      lines.push(`  ${name}: ${this.arc56.templateVariables![name]},`);
+      lines.push(`  ${name}: ${this.arc56.templateVariables![name].type},`);
     });
 
     lines.push("}");
