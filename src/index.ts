@@ -349,8 +349,6 @@ export default class ARC56Generator {
   ${staticContent.importsAndMethodParams}
 
   const ARC56_JSON = \`${JSON.stringify(this.arc56)}\`
-
-  ${staticContent.arc56TypeDefinitions}
   
   ${this.getABITypeLines().join("\n")}
 
