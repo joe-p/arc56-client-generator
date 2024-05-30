@@ -1,6 +1,6 @@
-import { ARC56AppClient } from "../src/arc56_client";
+import { ARC56AppClient } from "../../src/arc56_client";
 import arc56 from "./ARC56Test.arc56.json";
-import { type ARC56Contract } from "../src/types/arc56";
+import { type ARC56Contract } from "../../src/types/arc56";
 
 import {
   AlgorandClient,

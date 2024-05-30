@@ -5,7 +5,7 @@ import AlgokitComposer, {
 } from "@algorandfoundation/algokit-utils/types/composer";
 import algosdk from "algosdk";
 import { type SendAtomicTransactionComposerResults } from "@algorandfoundation/algokit-utils/types/transaction";
-import { ARC56AppClient } from "../src/arc56_client";
+import { ARC56AppClient } from "../../src/arc56_client";
 
 type MethodParams = Omit<MethodCallParams,"args" | "appId" | "method" | "sender"> & { sender?: string };
 `.trim();

@@ -1,6 +1,6 @@
-import ARC56Generator from "../src";
-import arc56Ref from "../example/ARC56Test.arc56.json";
-import { type ARC56Contract } from "../src/types/arc56";
+import ARC56Generator from "../../src";
+import arc56Ref from "./ARC56Test.arc56.json";
+import { type ARC56Contract } from "../../src/types/arc56";
 import { writeFileSync } from "fs";
 import path from "path";
 
