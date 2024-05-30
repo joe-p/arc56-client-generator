@@ -370,6 +370,33 @@ export class ARC56AppClient {
     );
   }
 
+  async updateMethodCall(methodName: string, methodParams: MethodParams = {}) {
+    return await this.callWithOC(
+      methodName,
+      algosdk.OnApplicationComplete.UpdateApplicationOC,
+      methodParams
+    );
+  }
+
+  async deleteMethodCall(methodName: string, methodParams: MethodParams = {}) {
+    return await this.callWithOC(
+      methodName,
+      algosdk.OnApplicationComplete.DeleteApplicationOC,
+      methodParams
+    );
+  }
+
+  async closeOutMethodCall(
+    methodName: string,
+    methodParams: MethodParams = {}
+  ) {
+    return await this.callWithOC(
+      methodName,
+      algosdk.OnApplicationComplete.CloseOutOC,
+      methodParams
+    );
+  }
+
   async createMethodCall(
     methodName: string,
     methodParams: MethodParams & {

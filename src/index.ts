@@ -12,6 +12,16 @@ export default class ARC56Generator {
     this.arc56 = arc56;
   }
 
+  getTypeScriptType(type: string): string {
+    // TODO: Fix imported types in TEALScript ARC56 generation
+    return type
+      .split(".")
+      .at(-1)!
+      .replace(/\[\d+\]/, "[]")
+      .replaceAll("(", "[")
+      .replaceAll(")", "]");
+  }
+
   getABITypeLines() {
     const abiTypes: string[] = [];
 
@@ -26,8 +36,9 @@ export default class ARC56Generator {
       if (this.arc56.structs[type]) return;
 
       // If this is an array type, push the base type
-      if (type.match(/\[\d+\]$/)) {
-        pushType(type.replace(/\[\d+\]$/, ""));
+      if (type.match(/\[\d*\]$/)) {
+        pushType(type.replace(/\[\d*\]$/, ""));
+        return;
       }
 
       if (type.startsWith("(")) {
@@ -38,9 +49,11 @@ export default class ARC56Generator {
         tupleType.childTypes.forEach((t) => {
           pushType(t.toString());
         });
-      } else {
-        abiTypes.push(type);
+
+        return;
       }
+
+      abiTypes.push(type);
     };
 
     Object.values(this.arc56.templateVariables ?? {}).forEach((t) => {
@@ -84,8 +97,22 @@ export default class ARC56Generator {
 
     const lines = ["// Aliases for non-encoded ABI values"];
     abiTypes.forEach((t) => {
-      if (t.match(/^uint/)) typeMap.push({ abiType: t, tsType: "bigint" });
-      if (t === "bytes") typeMap.push({ abiType: t, tsType: "string" }); // TODO: Also support Uint8Array
+      if (t.match(/^uint/)) {
+        typeMap.push({ abiType: t, tsType: "bigint" });
+      } else if (t === "bytes" || t === "byte") {
+        // TODO: Also support Uint8Array
+        typeMap.push({ abiType: t, tsType: "string" });
+      } else if (t === "address") {
+        typeMap.push({ abiType: t, tsType: "string" });
+      } else if (t === "bool") {
+        typeMap.push({ abiType: t, tsType: "boolean" });
+      } else if (
+        ["pay", "axfer", "afrz", "keyreg", "appl", "acfg"].includes(t)
+      ) {
+        typeMap.push({ abiType: t, tsType: "algosdk.Transaction" });
+      } else {
+        throw Error(`Unknown ABI type: ${t}`);
+      }
     });
 
     const abiTypeLines = typeMap.map(
@@ -102,11 +129,16 @@ export default class ARC56Generator {
       if (structName.includes(" ")) {
         return "";
       } else {
-        return `export type ${structName} = ${JSON.stringify(
+        // TODO: Fix imported types in TEALScript ARC56 generation
+        return `export type ${structName.split(".").at(-1)} = ${JSON.stringify(
           this.arc56.structs[structName],
           null,
           2
-        )}`.replace(/"/g, "");
+        )}`
+          .replace(/"/g, "")
+          .replaceAll("(", "[")
+          .replaceAll(")", "]")
+          .replace(/\[\d+\]/g, "[]");
       }
     });
 
@@ -159,7 +191,7 @@ export default class ARC56Generator {
       this.arc56.methods.forEach((m) => {
         if (!m.actions.call.includes(oc)) return;
         lines.push(
-          `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}}> => {`
+          `${m.name}: async (${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${this.getTypeScriptType(m.returns.struct ?? m.returns.type)}}> => {`
         );
 
         // return this.methodCall("foo", { ...methodParams, args: [inputs] });
@@ -198,7 +230,7 @@ export default class ARC56Generator {
     this.arc56.methods.forEach((m) => {
       if (m.actions.create.length === 0) return;
       lines.push(
-        `${m.name}: async (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
+        `${m.name}: async (${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
       );
 
       lines.push(
@@ -218,7 +250,7 @@ export default class ARC56Generator {
 
     this.arc56.methods.forEach((m) => {
       lines.push(
-        `${m.name}: (${m.args.map((a) => `${a.name}: ${a.struct ?? a.type}`)}): MethodCallParams => {`
+        `${m.name}: (${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}): MethodCallParams => {`
       );
 
       lines.push(
@@ -246,11 +278,11 @@ export default class ARC56Generator {
             const k = this.arc56.state.keys[storageType][name];
             if (storageType === "local") {
               lines.push(
-                `${name}: async (address: string): Promise<${k.valueType}> => { return this.getState.key("${name}", address) },`
+                `${name}: async (address: string): Promise<${this.getTypeScriptType(k.valueType)}> => { return this.getState.key("${name}", address) },`
               );
             } else {
               lines.push(
-                `${name}: async (): Promise<${k.valueType}> => { return this.getState.key("${name}") },`
+                `${name}: async (): Promise<${this.getTypeScriptType(k.valueType)}> => { return this.getState.key("${name}") },`
               );
             }
           });
@@ -271,11 +303,11 @@ export default class ARC56Generator {
 
             if (storageType === "local") {
               lines.push(
-                `value: async (address: string, key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map.value("${name}", key, address) },`
+                `value: async (address: string, key: ${this.getTypeScriptType(m.keyType)}): Promise<${this.getTypeScriptType(m.valueType)}> => { return this.getState.map.value("${name}", key, address) },`
               );
             } else {
               lines.push(
-                `value: async (key: ${m.keyType}): Promise<${m.valueType}> => { return this.getState.map.value("${name}", key) },`
+                `value: async (key: ${this.getTypeScriptType(m.keyType)}): Promise<${this.getTypeScriptType(m.valueType)}> => { return this.getState.map.value("${name}", key) },`
               );
             }
 
@@ -299,7 +331,7 @@ export default class ARC56Generator {
       if (m.returns.type === "void") return;
 
       lines.push(
-        `${m.name}: (rawValue: Uint8Array): ${m.returns.struct ?? m.returns.type} => {`
+        `${m.name}: (rawValue: Uint8Array): ${this.getTypeScriptType(m.returns.struct ?? m.returns.type)} => {`
       );
 
       lines.push(`return this.decodeMethodReturnValue("${m.name}", rawValue);`);
@@ -349,6 +381,7 @@ export default class ARC56Generator {
     try {
       return await format(content, { parser: "typescript" });
     } catch (e) {
+      console.debug(content);
       throw Error(`Error formatting generated code: ${e}`);
     }
   }
