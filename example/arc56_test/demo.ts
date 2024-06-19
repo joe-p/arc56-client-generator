@@ -18,14 +18,14 @@ async function main() {
   });
 
   const { appId, appAddress } = await appClient
-    .create({ templateVariables: { someNumber: 1337n } })
-    .createApplication();
+    .create
+    .createApplication({ templateVariables: { someNumber: 1337n } });
   console.log("App ID:", appId, "App Address:", appAddress);
 
   const inputs: Inputs = { add: { a: 1n, b: 2n }, subtract: { a: 10n, b: 5n } };
 
   // Call the app with default sender
-  const outputs = await appClient.call().foo(inputs);
+  const outputs = await appClient.call.foo({args: {inputs}});
   const { sum, difference } = outputs.returnValue;
   console.log("sum:", sum, "difference:", difference);
 
@@ -38,19 +38,20 @@ async function main() {
     amount: microAlgos(10_000_000),
   });
 
-  const bobOutputs = await appClient.call({ sender: bob }).foo(inputs);
+  const bobOutputs = await appClient.call.foo({ args: { inputs }, sender: bob });
   const { sum: bobSum, difference: bobDifference } = bobOutputs.returnValue;
   console.log("bobSum:", bobSum, "bobDifference:", bobDifference);
 
   // Overwrite some of the transaction fields
   await appClient
-    .call({
+    .call
+    .foo({
+      args: { inputs },
       // The number of rounds between firstValid and lastValid will be 50
       // This is also used to determine how long the client should wait for confirmation
       validityWindow: 50,
       note: "Hello world",
-    })
-    .foo(inputs);
+    });
 
   const anotherAppClient = new ARC56TestClient({
     algorand,
@@ -60,19 +61,18 @@ async function main() {
 
   const { appId: anoterAppId, appAddress: anotherAppAddress } =
     await anotherAppClient
-      .create({ templateVariables: { someNumber: 1337n } })
-      .createApplication();
+      .create
+      .createApplication({ templateVariables: { someNumber: 1337n } });
   console.log("App ID:", anoterAppId, "App Address:", anotherAppAddress);
 
   // Composer together multiple appClients
   const result = await algorand
     .newGroup()
     .addMethodCall(
-      // Use the extraFee on the main client to cover the fee for the other client
-      appClient.params({ extraFee: microAlgos(1_000) }).foo(inputs)
+      appClient.params.foo({ args: { inputs }, extraFee: microAlgos(1_000) })
     )
     .addMethodCall(
-      anotherAppClient.params({ staticFee: microAlgos(0) }).foo(inputs)
+      anotherAppClient.params.foo({ args: { inputs }, staticFee: microAlgos(0) })
     )
     .execute();
 
@@ -89,8 +89,8 @@ async function main() {
   try {
     // This will throw an error
     await appClient
-      .call()
-      .foo({ subtract: { a: 1n, b: 100n }, add: { a: 1n, b: 2n } });
+      .call
+      .foo({args: { inputs: { subtract: { a: 1n, b: 100n }, add: { a: 1n, b: 2n } } }});
   } catch (e) {
     // We got a human error message! Error: Runtime error when executing ARC56Test (appId: 6814) in transaction DEFDPU2NOGXPMNKTHJLRI5CWLDRYRHQDBMF5HXPJ3E74GWOVKNSA: subtract.a must be greater than subtract.b
     console.log(`We got a human error message! ${e}`);
@@ -109,7 +109,7 @@ async function main() {
     amount: microAlgos(1_000_000),
   });
 
-  await appClient.optIn().optInToApplication();
+  await appClient.optIn.optInToApplication();
 
   console.log("localKey", await appClient.state.keys.localKey(defaultSender));
 

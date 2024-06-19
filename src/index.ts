@@ -184,29 +184,33 @@ export default class ARC56Generator {
       if (numMethods === 0) return;
 
       lines.push(
-        `${ocMap[oc]} = (methodParams: MethodParams = {}) => {`,
-        "return {"
+        `${ocMap[oc]} = {`,
       );
 
       this.arc56.methods.forEach((m) => {
         if (!m.actions.call.includes(oc)) return;
-        lines.push(
-          `${m.name}: async (${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${this.getTypeScriptType(m.returns.struct ?? m.returns.type)}}> => {`
-        );
 
-        // return this.methodCall("foo", { ...methodParams, args: [inputs] });
+        if (m.args.length === 0) {
+          lines.push(
+            `${m.name}: async (params?: MethodParams): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${this.getTypeScriptType(m.returns.struct ?? m.returns.type)}}> => {`
+          );
+        } else {
+          lines.push(
+            `${m.name}: async (params: MethodParams & {args: { ${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}}}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${this.getTypeScriptType(m.returns.struct ?? m.returns.type)}}> => {`
+          );
+        }
+      
 
         let methodName = `${ocMap[oc]}MethodCall`;
         if (oc === "NoOp") methodName = "methodCall";
         lines.push(
-          `return this.${methodName}("${m.name}", { ...methodParams, args: [${m.args.map((a) => a.name).join(",")}] });`
+          `return this.${methodName}("${m.name}", { ...params, args: [${m.args.map((a) => "params.args." + a.name).join(",")}] });`
         );
         lines.push("},");
       });
 
       lines.push("};");
 
-      lines.push("};");
     });
 
     return lines;
@@ -215,53 +219,51 @@ export default class ARC56Generator {
   getCreateLines() {
     const lines: string[] = [];
 
-    if (this.arc56.templateVariables !== undefined) {
-      lines.push(
-        `create = (methodParams: MethodParams & { templateVariables: TemplateVariables; onComplete?: algosdk.OnApplicationComplete }) => {`
-      );
-    } else {
-      lines.push(
-        `create = (methodParams: MethodParams & { onComplete?: algosdk.OnApplicationComplete } = {}) => {`
-      );
-    }
-
-    lines.push(`return {`);
+    lines.push(
+      `create = {`
+    );
 
     this.arc56.methods.forEach((m) => {
       if (m.actions.create.length === 0) return;
       lines.push(
-        `${m.name}: async (${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
+        `${m.name}: async (params${m.args.length === 0 ? '?' : ''}: MethodParams & {
+          ${ m.args.length > 0 ? `args: { ${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}},` : ''} 
+          ${ this.arc56.templateVariables !== undefined ? `templateVariables: TemplateVariables` : ''}, 
+          onComplete?: algosdk.OnApplicationComplete}
+        ): Promise<{ result: SendAtomicTransactionComposerResults; returnValue: ${m.returns.struct ?? m.returns.type}; appId: bigint; appAddress: string}> => {`
       );
 
       lines.push(
-        `return this.createMethodCall("${m.name}", { ...methodParams, args: [${m.args.map((a) => a.name).join(",")}] });`
+        `return this.createMethodCall("${m.name}", { ...params, args: [${m.args.map((a) => "params.args." + a.name).join(",")}] });`
       );
 
       lines.push("},");
     });
-    lines.push("};");
     lines.push("};");
 
     return lines;
   }
 
   getParamsLines() {
-    const lines = ["params = (methodParams?: MethodParams) => {", "return {"];
+    const lines = ["params = {"];
 
     this.arc56.methods.forEach((m) => {
       lines.push(
-        `${m.name}: (${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}): MethodCallParams => {`
+        `${m.name}: (
+          params${m.args.length === 0 ? '?' : ''}: MethodParams & {
+          ${ m.args.length > 0 ? `args: { ${m.args.map((a) => `${a.name}: ${this.getTypeScriptType(a.struct ?? a.type)}`)}},` : ''} 
+          onComplete?: algosdk.OnApplicationComplete}
+        ): MethodCallParams => {`
       );
 
       lines.push(
-        `return this.getParams("${m.name}", { ...methodParams, args: [${m.args.map((a) => a.name).join(",")}] });`
+        `return this.getParams("${m.name}", { ...params, args: [${m.args.map((a) => "params.args." + a.name).join(",")}] });`
       );
       lines.push("},");
     });
 
     lines.push("};");
 
-    lines.push("};");
     return lines;
   }
 
