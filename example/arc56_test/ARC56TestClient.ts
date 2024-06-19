@@ -49,71 +49,72 @@ export class ARC56TestClient extends ARC56AppClient {
     super({ ...p, arc56: JSON.parse(ARC56_JSON) });
   }
 
-  params = (methodParams?: MethodParams) => {
-    return {
-      foo: (inputs: Inputs): MethodCallParams => {
-        return this.getParams("foo", { ...methodParams, args: [inputs] });
+  paramsForComposer = {
+    foo: (
+      params: MethodParams & {
+        args: { inputs: Inputs };
+        onComplete?: algosdk.OnApplicationComplete;
       },
-      optInToApplication: (): MethodCallParams => {
-        return this.getParams("optInToApplication", {
-          ...methodParams,
-          args: [],
-        });
-      },
-      createApplication: (): MethodCallParams => {
-        return this.getParams("createApplication", {
-          ...methodParams,
-          args: [],
-        });
-      },
-    };
-  };
-
-  call = (methodParams: MethodParams = {}) => {
-    return {
-      foo: async (
-        inputs: Inputs,
-      ): Promise<{
-        result: SendAtomicTransactionComposerResults;
-        returnValue: Outputs;
-      }> => {
-        return this.methodCall("foo", { ...methodParams, args: [inputs] });
-      },
-    };
-  };
-  optIn = (methodParams: MethodParams = {}) => {
-    return {
-      optInToApplication: async (): Promise<{
-        result: SendAtomicTransactionComposerResults;
-        returnValue: void;
-      }> => {
-        return this.optInMethodCall("optInToApplication", {
-          ...methodParams,
-          args: [],
-        });
-      },
-    };
-  };
-
-  create = (
-    methodParams: MethodParams & {
-      templateVariables: TemplateVariables;
-      onComplete?: algosdk.OnApplicationComplete;
+    ): MethodCallParams => {
+      return this.getParams("foo", { ...params, args: [params.args.inputs] });
     },
-  ) => {
-    return {
-      createApplication: async (): Promise<{
-        result: SendAtomicTransactionComposerResults;
-        returnValue: void;
-        appId: bigint;
-        appAddress: string;
-      }> => {
-        return this.createMethodCall("createApplication", {
-          ...methodParams,
-          args: [],
-        });
+    optInToApplication: (
+      params?: MethodParams & {
+        onComplete?: algosdk.OnApplicationComplete;
       },
-    };
+    ): MethodCallParams => {
+      return this.getParams("optInToApplication", { ...params, args: [] });
+    },
+    createApplication: (
+      params?: MethodParams & {
+        onComplete?: algosdk.OnApplicationComplete;
+      },
+    ): MethodCallParams => {
+      return this.getParams("createApplication", { ...params, args: [] });
+    },
+  };
+
+  call = {
+    foo: async (
+      params: MethodParams & { args: { inputs: Inputs } },
+    ): Promise<{
+      result: SendAtomicTransactionComposerResults;
+      returnValue: Outputs;
+    }> => {
+      return this.methodCall("foo", { ...params, args: [params.args.inputs] });
+    },
+  };
+  optIn = {
+    optInToApplication: async (
+      params?: MethodParams,
+    ): Promise<{
+      result: SendAtomicTransactionComposerResults;
+      returnValue: void;
+    }> => {
+      return this.optInMethodCall("optInToApplication", {
+        ...params,
+        args: [],
+      });
+    },
+  };
+
+  create = {
+    createApplication: async (
+      params?: MethodParams & {
+        templateVariables: TemplateVariables;
+        onComplete?: algosdk.OnApplicationComplete;
+      },
+    ): Promise<{
+      result: SendAtomicTransactionComposerResults;
+      returnValue: void;
+      appId: bigint;
+      appAddress: string;
+    }> => {
+      return this.createMethodCall("createApplication", {
+        ...params,
+        args: [],
+      });
+    },
   };
 
   state = {
