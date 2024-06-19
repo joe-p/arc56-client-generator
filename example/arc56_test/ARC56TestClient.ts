@@ -49,7 +49,7 @@ export class ARC56TestClient extends ARC56AppClient {
     super({ ...p, arc56: JSON.parse(ARC56_JSON) });
   }
 
-  params = {
+  paramsForComposer = {
     foo: (
       params: MethodParams & {
         args: { inputs: Inputs };

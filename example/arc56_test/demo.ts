@@ -69,10 +69,10 @@ async function main() {
   const result = await algorand
     .newGroup()
     .addMethodCall(
-      appClient.params.foo({ args: { inputs }, extraFee: microAlgos(1_000) })
+      appClient.paramsForComposer.foo({ args: { inputs }, extraFee: microAlgos(1_000) })
     )
     .addMethodCall(
-      anotherAppClient.params.foo({ args: { inputs }, staticFee: microAlgos(0) })
+      anotherAppClient.paramsForComposer.foo({ args: { inputs }, staticFee: microAlgos(0) })
     )
     .execute();
 
